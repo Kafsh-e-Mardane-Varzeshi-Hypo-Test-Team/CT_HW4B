@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 
+	_ "github.com/lib/pq"
+
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/config"
 )
 
@@ -21,6 +23,7 @@ func NewCockroachClient(cfg config.CockroachDBConfig) (*CockroachClient, error) 
 		cfg.Database,
 	)
 	db, err := sql.Open("postgres", connStr)
+	log.Printf("[db.NewCockroachClient] Connecting to CockroachDB with connection string: %s", connStr)
 	if err != nil {
 		return nil, fmt.Errorf("[db.NewCockroachClient] Failed to connect to CockroachDB: %v", err)
 	}
@@ -35,7 +38,7 @@ func NewCockroachClient(cfg config.CockroachDBConfig) (*CockroachClient, error) 
 }
 
 func (c *CockroachClient) LoadSchema(cfg config.CockroachDBConfig) error {
-	_, err := c.Db.Exec("CREATE DATABASE IF NOT EXISTS" + cfg.Database)
+	_, err := c.Db.Exec("CREATE DATABASE IF NOT EXISTS " + cfg.Database)
 	if err != nil {
 		return fmt.Errorf("[db.LoadSchema] Failed to create database: %v", err)
 	}
@@ -58,6 +61,7 @@ func (c *CockroachClient) LoadSchema(cfg config.CockroachDBConfig) error {
 	if err != nil {
 		return fmt.Errorf("[db.LoadSchema] Failed to create tables: %v", err)
 	}
+	log.Println("[db.LoadSchema] Successfully loaded CockroachDB schema!")
 	return nil
 }
 

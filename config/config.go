@@ -26,10 +26,19 @@ type CassandraConfig struct {
 	Keyspace string
 }
 
+type ClickHouseConfig struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	Database string
+}
+
 type Config struct {
 	CockroachDBConfig
 	KafkaConfig
-	CassandraConfig CassandraConfig
+	CassandraConfig
+	ClickHouseConfig
 }
 
 func getEnv(key, defaultValue string) string {
@@ -44,6 +53,11 @@ func Load() *Config {
 	cassandraPort, err := strconv.Atoi(getEnv("CASSANDRA_PORT", "9042"))
 	if err != nil {
 		log.Fatalf("[config.Load] Invalid CASSANDRA_PORT: %v", err)
+	}
+
+	clickhousePort, err := strconv.Atoi(getEnv("CLICKHOUSE_PORT", "9000"))
+	if err != nil {
+		log.Fatalf("[config.Load] Invalid CLICKHOUSE_PORT: %v", err)
 	}
 
 	cfg := &Config{
@@ -63,6 +77,13 @@ func Load() *Config {
 			User:     getEnv("CASSANDRA_USER", "cassandra_user"),
 			Password: getEnv("CASSANDRA_PASSWORD", "cassandra_password"),
 			Keyspace: getEnv("CASSANDRA_KEYSPACE", "logs"),
+		},
+		ClickHouseConfig: ClickHouseConfig{
+			Host:     getEnv("CLICKHOUSE_HOST", "localhost"),
+			Port:     clickhousePort,
+			Username: getEnv("CLICKHOUSE_USERNAME", "clickhouse_user"),
+			Password: getEnv("CLICKHOUSE_PASSWORD", "clickhouse_password"),
+			Database: getEnv("CLICKHOUSE_DATABASE", "logs"),
 		},
 	}
 	return cfg

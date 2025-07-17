@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/cassandra"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/kafka"
 	"github.com/gin-gonic/gin"
@@ -13,7 +14,8 @@ import (
 
 type Handler struct {
 	cockroachClient *db.CockroachClient
-	kafkaClient     *kafka.KafkaClient
+	kafkaProducer   *kafka.Producer
+	cassandraClient *cassandra.CassandraClient
 }
 
 type LogPayload struct {
@@ -28,8 +30,12 @@ type LogRequest struct {
 	Payload   LogPayload `json:"payload" binding:"required"`
 }
 
-func NewHandler(cockroachClient *db.CockroachClient, kafkaClient *kafka.KafkaClient) *Handler {
-	return &Handler{cockroachClient: cockroachClient, kafkaClient: kafkaClient}
+func NewHandler(cockroachClient *db.CockroachClient, kafkaProducer *kafka.Producer, cassandraClient *cassandra.CassandraClient) *Handler {
+	return &Handler{
+		cockroachClient: cockroachClient,
+		cassandraClient: cassandraClient,
+		kafkaProducer:   kafkaProducer,
+	}
 }
 
 func (h *Handler) SubmitLogHandler(c *gin.Context) {
@@ -54,7 +60,7 @@ func (h *Handler) SubmitLogHandler(c *gin.Context) {
 		return
 	}
 
-	err = h.kafkaClient.ProduceMessage(message)
+	err = h.kafkaProducer.ProduceMessage(message)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send log to Kafka"})
 		log.Printf("[api.SubmitLogHandler] Failed to produce message to Kafka: %v", err)

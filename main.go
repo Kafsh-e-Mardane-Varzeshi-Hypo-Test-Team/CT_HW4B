@@ -33,10 +33,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("[main] Failed to create Cassandra client: %v", err)
 	}
-	err = cassandra.LoadSchema()
-	if err != nil {
-		log.Fatalf("[main] Failed to load Cassandra schema: %v", err)
-	}
 
 	handler := api.NewHandler(cockroach, kafkaProducer, cassandra)
 	r := gin.Default()

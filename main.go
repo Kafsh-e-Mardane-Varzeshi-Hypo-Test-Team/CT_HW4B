@@ -6,6 +6,7 @@ import (
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/api"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/config"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/cassandra"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/clickhouse"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/cockroach"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/kafka"
 	"github.com/gin-gonic/gin"
@@ -35,6 +36,13 @@ func main() {
 	}
 	kafkaConsumerCassandra := kafka.NewConsumer(cfg.KafkaConfig, cassandra.Insert)
 	go kafkaConsumerCassandra.ConsumeMessages()
+
+    clickhouse, err := clickhouse.NewClickHouseClient(cfg.ClickHouseConfig)
+    if err != nil {
+        log.Fatalf("[main] Failed to create ClickHouse client: %v", err)
+    }
+    kafkaConsumerClickHouse := kafka.NewConsumer(cfg.KafkaConfig, clickhouse.Insert)
+    go kafkaConsumerClickHouse.ConsumeMessages()
 
 	handler := api.NewHandler(cockroach, kafkaProducer, cassandra)
 	r := gin.Default()

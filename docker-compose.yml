@@ -39,8 +39,21 @@ services:
       depends_on:
         - cassandra
       volumes:
-        - ./cassandra/init.cql:/init.cql
+        - ./db/cassandra/init.cql:/init.cql
       command: /bin/bash -c "sleep 60 && echo loading cassandra keyspace && cqlsh cassandra -f /init.cql"
+  
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./db/clickhouse/init.sql:/init.sql
+    environment:
+      - CLICKHOUSE_DB=logs
+      - CLICKHOUSE_USER=clickhouse_user
+      - CLICKHOUSE_PASSWORD=clickhouse_password
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
 
 volumes:
   kafka_data:

@@ -1,16 +1,19 @@
 package api
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/kafka"
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
 	cockroachClient *db.CockroachClient
+	kafkaClient     *kafka.KafkaClient
 }
 
 type LogPayload struct {
@@ -25,8 +28,8 @@ type LogRequest struct {
 	Payload   LogPayload `json:"payload" binding:"required"`
 }
 
-func NewHandler(cockroachClient *db.CockroachClient) *Handler {
-	return &Handler{cockroachClient: cockroachClient}
+func NewHandler(cockroachClient *db.CockroachClient, kafkaClient *kafka.KafkaClient) *Handler {
+	return &Handler{cockroachClient: cockroachClient, kafkaClient: kafkaClient}
 }
 
 func (h *Handler) SubmitLogHandler(c *gin.Context) {
@@ -44,5 +47,20 @@ func (h *Handler) SubmitLogHandler(c *gin.Context) {
 		return
 	}
 
-	// TODO: Produce to kafka
+	message, err := json.Marshal(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process log"})
+		log.Printf("[api.SubmitLogHandler] Failed to marshal log request: %v", err)
+		return
+	}
+
+	err = h.kafkaClient.ProduceMessage(message)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send log to Kafka"})
+		log.Printf("[api.SubmitLogHandler] Failed to produce message to Kafka: %v", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "Log submitted successfully"})
+	log.Printf("[api.SubmitLogHandler] Log submitted successfully for project ID: %s", req.ProjectID)
 }

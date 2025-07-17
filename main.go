@@ -6,6 +6,7 @@ import (
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/api"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/config"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/kafka"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,8 +23,13 @@ func main() {
 		log.Fatalf("[main] Failed to load db schema: %v", err)
 	}
 
-	handler := api.NewHandler(cockroach)
+	kafka, err := kafka.NewKafkaClient(cfg.KafkaConfig)
+	if err != nil {
+		log.Fatalf("[main] Failed to create Kafka client: %v", err)
+	}
+
+	handler := api.NewHandler(cockroach, kafka)
 	r := gin.Default()
 	r.POST("/api/logs", handler.SubmitLogHandler)
-	log.Fatalf("[main] Error while running gin router: %v", r.Run(":8080"))
+	log.Fatalf("[main] Error while running gin router: %v", r.Run(":9000"))
 }

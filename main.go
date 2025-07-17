@@ -39,5 +39,5 @@ func main() {
 	handler := api.NewHandler(cockroach, kafkaProducer, cassandra)
 	r := gin.Default()
 	r.POST("/api/logs", handler.SubmitLogHandler)
-	log.Fatalf("[main] Error while running gin router: %v", r.Run(":9000"))
+	log.Fatalf("[main] Error while running gin router: %v", r.Run(":9090"))
 }

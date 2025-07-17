@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/cassandra"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/kafka"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,18 +16,6 @@ type Handler struct {
 	cockroachClient *db.CockroachClient
 	kafkaProducer   *kafka.Producer
 	cassandraClient *cassandra.CassandraClient
-}
-
-type LogPayload struct {
-	Name      string    `json:"name" binding:"required"`
-	Timestamp time.Time `json:"timestamp" binding:"required"`
-	Keys      []string  `json:"keys" binding:"required"`
-}
-
-type LogRequest struct {
-	ProjectID string     `json:"project_id" binding:"required"`
-	APIKey    string     `json:"api_key" binding:"required"`
-	Payload   LogPayload `json:"payload" binding:"required"`
 }
 
 func NewHandler(cockroachClient *db.CockroachClient, kafkaProducer *kafka.Producer, cassandraClient *cassandra.CassandraClient) *Handler {
@@ -39,7 +27,7 @@ func NewHandler(cockroachClient *db.CockroachClient, kafkaProducer *kafka.Produc
 }
 
 func (h *Handler) SubmitLogHandler(c *gin.Context) {
-	var req LogRequest
+	var req models.LogRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

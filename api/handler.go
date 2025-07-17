@@ -10,6 +10,7 @@ import (
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/kafka"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/models"
 	"github.com/gin-gonic/gin"
+	"github.com/gocql/gocql"
 )
 
 type Handler struct {
@@ -41,6 +42,7 @@ func (h *Handler) SubmitLogHandler(c *gin.Context) {
 		return
 	}
 
+	req.EventID = gocql.TimeUUID()
 	message, err := json.Marshal(req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process log"})

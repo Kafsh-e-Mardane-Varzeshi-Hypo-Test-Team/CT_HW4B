@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/gocql/gocql"
+)
 
 type LogPayload struct {
 	Name      string    `json:"name" binding:"required"`
@@ -9,6 +13,7 @@ type LogPayload struct {
 }
 
 type LogRequest struct {
+	EventID   gocql.UUID     `json:"event_id" binding:"required"`
 	ProjectID string     `json:"project_id" binding:"required"`
 	APIKey    string     `json:"api_key" binding:"required"`
 	Payload   LogPayload `json:"payload" binding:"required"`

@@ -40,7 +40,7 @@ func (c *CassandraClient) Insert(event models.LogRequest) error {
 		keys
 	) VALUES (?, ?, ?, ?, ?)`
 
-	err := c.Session.Query(query, gocql.TimeUUID(),
+	err := c.Session.Query(query, event.EventID,
 		event.ProjectID, event.Payload.Name, event.Payload.Timestamp,
 		event.Payload.Keys).Exec()
 	if err != nil {

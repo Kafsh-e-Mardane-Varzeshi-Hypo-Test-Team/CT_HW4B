@@ -5,20 +5,20 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/cassandra"
-	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db"
-	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/kafka"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/cassandra"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/cockroach"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/kafka"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/models"
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
-	cockroachClient *db.CockroachClient
+	cockroachClient *cockroach.CockroachClient
 	kafkaProducer   *kafka.Producer
 	cassandraClient *cassandra.CassandraClient
 }
 
-func NewHandler(cockroachClient *db.CockroachClient, kafkaProducer *kafka.Producer, cassandraClient *cassandra.CassandraClient) *Handler {
+func NewHandler(cockroachClient *cockroach.CockroachClient, kafkaProducer *kafka.Producer, cassandraClient *cassandra.CassandraClient) *Handler {
 	return &Handler{
 		cockroachClient: cockroachClient,
 		cassandraClient: cassandraClient,

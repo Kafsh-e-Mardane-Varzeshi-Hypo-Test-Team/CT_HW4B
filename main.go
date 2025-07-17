@@ -4,17 +4,17 @@ import (
 	"log"
 
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/api"
-	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/cassandra"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/config"
-	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db"
-	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/kafka"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/cassandra"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/cockroach"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/kafka"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	cfg := config.Load()
 
-	cockroach, err := db.NewCockroachClient(cfg.CockroachDBConfig)
+	cockroach, err := cockroach.NewCockroachClient(cfg.CockroachDBConfig)
 	if err != nil {
 		log.Fatalf("[main] Failed to create CockroachDB client: %v", err)
 	}

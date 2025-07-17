@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/config"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/models"
 	"github.com/gocql/gocql"
 )
 
@@ -28,4 +29,24 @@ func NewCassandraClient(cfg config.CassandraConfig) (*CassandraClient, error) {
 
 	log.Println("Successfully connected to Cassandra!")
 	return &CassandraClient{Session: session}, nil
+}
+
+func (c *CassandraClient) Insert(event models.LogRequest) error {
+	query := `INSERT INTO logs.events (
+		event_id,
+		project_id,
+		name,
+		time,
+		keys
+	) VALUES (?, ?, ?, ?, ?)`
+
+	err := c.Session.Query(query, gocql.TimeUUID(),
+		event.ProjectID, event.Payload.Name, event.Payload.Timestamp,
+		event.Payload.Keys).Exec()
+	if err != nil {
+		return fmt.Errorf("[cassandra.Insert] Failed to insert event: %v", err)
+	}
+
+	log.Printf("[cassandra.Insert] Successfully inserted event: %+v", event)
+	return nil
 }

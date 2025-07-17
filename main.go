@@ -33,6 +33,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("[main] Failed to create Cassandra client: %v", err)
 	}
+	kafkaConsumerCassandra := kafka.NewConsumer(cfg.KafkaConfig, cassandra.Insert)
+	go kafkaConsumerCassandra.ConsumeMessages()
 
 	handler := api.NewHandler(cockroach, kafkaProducer, cassandra)
 	r := gin.Default()

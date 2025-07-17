@@ -3,8 +3,10 @@ package main
 import (
 	"log"
 
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/api"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/config"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -19,4 +21,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("[main] Failed to load db schema: %v", err)
 	}
+
+	handler := api.NewHandler(cockroach)
+	r := gin.Default()
+	r.POST("/api/logs", handler.SubmitLogHandler)
+	log.Fatalf("[main] Error while running gin router: %v", r.Run(":8080"))
 }

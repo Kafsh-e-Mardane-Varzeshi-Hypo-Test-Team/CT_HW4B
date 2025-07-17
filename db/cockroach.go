@@ -60,3 +60,15 @@ func (c *CockroachClient) LoadSchema(cfg config.CockroachDBConfig) error {
 	}
 	return nil
 }
+
+func (c *CockroachClient) ValidateAPIKey(apiKey, projectID string) bool {
+	var valid bool
+	err := c.Db.QueryRow(
+		"SELECT EXISTS(SELECT 1 FROM projects WHERE api_key = $1 AND id = $2)",
+		apiKey, projectID,
+	).Scan(&valid)
+	if err != nil {
+		log.Printf("API key validation error: %v", err)
+	}
+	return valid
+}

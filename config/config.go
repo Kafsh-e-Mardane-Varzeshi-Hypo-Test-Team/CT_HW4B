@@ -4,11 +4,13 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type CockroachDBConfig struct {
 	Host     string
-	Port     string
+	Ports    []int
+	Port     string // Keep for backward compatibility
 	User     string
 	Database string
 }
@@ -60,9 +62,23 @@ func Load() *Config {
 		log.Fatalf("[config.Load] Invalid CLICKHOUSE_PORT: %v", err)
 	}
 
+	// Parse CockroachDB ports from environment variable
+	cockroachPorts := getEnv("COCKROACHDB_PORTS", "26257,26258,26259")
+	portStrings := strings.Split(cockroachPorts, ",")
+	var ports []int
+	for _, portStr := range portStrings {
+		port, err := strconv.Atoi(strings.TrimSpace(portStr))
+		if err != nil {
+			log.Printf("[config.Load] Invalid port in COCKROACHDB_PORTS: %s, skipping", portStr)
+			continue
+		}
+		ports = append(ports, port)
+	}
+
 	cfg := &Config{
 		CockroachDBConfig: CockroachDBConfig{
 			Host:     getEnv("COCKROACHDB_HOST", "localhost"),
+			Ports:    ports,
 			Port:     getEnv("COCKROACHDB_PORT", "26257"),
 			User:     getEnv("COCKROACHDB_USER", "root"),
 			Database: getEnv("COCKROACHDB_DATABASE", "logs"),

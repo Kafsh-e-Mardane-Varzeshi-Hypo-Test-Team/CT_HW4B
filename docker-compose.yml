@@ -16,14 +16,49 @@ services:
     mem_limit: 512m
     cpus: 0.5
   
-  cockroachdb:
+  cockroachdb-1:
     image: cockroachdb/cockroach:latest
-    command: start-single-node --insecure
+    command: start --insecure --advertise-addr=cockroachdb-1 --join=cockroachdb-1,cockroachdb-2,cockroachdb-3
     ports:
       - "26257:26257"
       - "8080:8080"
     mem_limit: 512m
     cpus: 0.5
+    networks:
+      - cockroach-network
+
+  cockroachdb-2:
+    image: cockroachdb/cockroach:latest
+    command: start --insecure --advertise-addr=cockroachdb-2 --join=cockroachdb-1,cockroachdb-2,cockroachdb-3
+    ports:
+      - "26258:26257"
+      - "8081:8080"
+    mem_limit: 512m
+    cpus: 0.5
+    networks:
+      - cockroach-network
+
+  cockroachdb-3:
+    image: cockroachdb/cockroach:latest
+    command: start --insecure --advertise-addr=cockroachdb-3 --join=cockroachdb-1,cockroachdb-2,cockroachdb-3
+    ports:
+      - "26259:26257"
+      - "8082:8080"
+    mem_limit: 512m
+    cpus: 0.5
+    networks:
+      - cockroach-network
+
+  cockroachdb-init:
+    image: cockroachdb/cockroach:latest
+    command: init --insecure --host=cockroachdb-1
+    depends_on:
+      - cockroachdb-1
+      - cockroachdb-2
+      - cockroachdb-3
+    networks:
+      - cockroach-network
+    restart: "no"
     
   cassandra:
     image: cassandra:latest
@@ -69,3 +104,7 @@ services:
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     mem_limit: 512m
     cpus: 0.5
+
+networks:
+  cockroach-network:
+    driver: bridge

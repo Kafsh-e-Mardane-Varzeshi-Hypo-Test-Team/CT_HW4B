@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/api"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/config"
@@ -16,13 +21,42 @@ import (
 func main() {
 	cfg := config.Load()
 
-	cockroach, err := cockroach.NewCockroachClient(cfg.CockroachDBConfig)
-	if err != nil {
-		log.Fatalf("[main] Failed to create CockroachDB client: %v", err)
+	// Initialize CockroachDB client with retry logic
+	var cockroachClient *cockroach.CockroachClient
+	var err error
+
+	// Retry connection to CockroachDB cluster
+	for i := 0; i < 5; i++ {
+		cockroachClient, err = cockroach.NewCockroachClient(cfg.CockroachDBConfig)
+		if err == nil {
+			break
+		}
+		log.Printf("[main] Attempt %d: Failed to connect to CockroachDB cluster: %v", i+1, err)
+		if i < 4 {
+			time.Sleep(time.Duration(1<<uint(i)) * time.Second)
+		}
 	}
-	err = cockroach.LoadSchema(cfg.CockroachDBConfig)
+
+	if err != nil {
+		log.Fatalf("[main] Failed to create CockroachDB client after retries: %v", err)
+	}
+	defer cockroachClient.Close()
+
+	// Load schema with retry
+	err = cockroachClient.RetryWithBackoff(func() error {
+		return cockroachClient.LoadSchema(cfg.CockroachDBConfig)
+	}, 3)
 	if err != nil {
 		log.Fatalf("[main] Failed to load db schema: %v", err)
+	}
+
+	// Log cluster status
+	clusterStatus, err := cockroachClient.GetClusterStatus()
+	if err != nil {
+		log.Printf("[main] Warning: Could not get cluster status: %v", err)
+	} else {
+		log.Printf("[main] CockroachDB cluster status: %d nodes, replication factor: %d",
+			clusterStatus["total_nodes"], clusterStatus["replication_factor"])
 	}
 
 	err = kafka.CreateTopic(cfg.KafkaConfig)
@@ -45,7 +79,7 @@ func main() {
 	kafkaConsumerClickHouse := kafka.NewConsumer(cfg.KafkaConfig, clickhouse.Insert)
 	go kafkaConsumerClickHouse.ConsumeMessages()
 
-	handler := api.NewHandler(cockroach, kafkaProducer, cassandra, clickhouse)
+	handler := api.NewHandler(cockroachClient, kafkaProducer, cassandra, clickhouse)
 	r := gin.Default()
 
 	// Load HTML templates
@@ -82,6 +116,52 @@ func main() {
 	r.GET("/api/projects/:id/events/details", handler.GetEventDetailsHandler)
 	r.POST("/api/logs", handler.SubmitLogHandler)
 
-	log.Printf("[main] Server starting on port 9090")
-	log.Fatalf("[main] Error while running gin router: %v", r.Run(":9090"))
+	// Health check endpoint
+	r.GET("/health", func(c *gin.Context) {
+		if err := cockroachClient.HealthCheck(); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy", "error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
+	})
+
+	// Cluster status endpoint
+	r.GET("/cluster-status", func(c *gin.Context) {
+		status, err := cockroachClient.GetClusterStatus()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, status)
+	})
+
+	// Create server
+	srv := &http.Server{
+		Addr:    ":9090",
+		Handler: r,
+	}
+
+	// Start server in a goroutine
+	go func() {
+		log.Printf("[main] Server starting on port 9090")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("[main] Error while running gin router: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown the server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("[main] Shutting down server...")
+
+	// Give outstanding requests a deadline for completion
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal("[main] Server forced to shutdown:", err)
+	}
+
+	log.Println("[main] Server exited")
 }

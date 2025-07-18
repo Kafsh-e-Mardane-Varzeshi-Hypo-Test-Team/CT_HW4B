@@ -18,22 +18,65 @@ type CockroachClient struct {
 }
 
 func NewCockroachClient(cfg config.CockroachDBConfig) (*CockroachClient, error) {
-	connStr := fmt.Sprintf(
-		"postgresql://%s@%s:%s/%s?sslmode=disable",
-		cfg.User,
-		cfg.Host,
-		cfg.Port,
-		cfg.Database,
-	)
-	db, err := sql.Open("postgres", connStr)
-	log.Printf("[db.NewCockroachClient] Connecting to CockroachDB with connection string: %s", connStr)
-	if err != nil {
-		return nil, fmt.Errorf("[db.NewCockroachClient] Failed to connect to CockroachDB: %v", err)
+	var db *sql.DB
+	var err error
+
+	// Try to connect to each port in the cluster
+	for i, port := range cfg.Ports {
+		connStr := fmt.Sprintf(
+			"postgresql://%s@%s:%d/%s?sslmode=disable&connect_timeout=10",
+			cfg.User,
+			cfg.Host,
+			port,
+			cfg.Database,
+		)
+
+		log.Printf("[db.NewCockroachClient] Attempting to connect to CockroachDB node %d: %s:%d", i+1, cfg.Host, port)
+
+		db, err = sql.Open("postgres", connStr)
+		if err != nil {
+			log.Printf("[db.NewCockroachClient] Failed to open connection to %s:%d: %v", cfg.Host, port, err)
+			continue
+		}
+
+		// Set connection pool settings for better performance
+		db.SetMaxOpenConns(25)
+		db.SetMaxIdleConns(5)
+		db.SetConnMaxLifetime(5 * time.Minute)
+
+		// Test the connection
+		err = db.Ping()
+		if err != nil {
+			log.Printf("[db.NewCockroachClient] Failed to ping %s:%d: %v", cfg.Host, port, err)
+			db.Close()
+			continue
+		}
+
+		log.Printf("[db.NewCockroachClient] Successfully connected to CockroachDB node: %s:%d", cfg.Host, port)
+		break
 	}
 
-	err = db.Ping()
-	if err != nil {
-		return nil, fmt.Errorf("[db.NewCockroachClient] Failed to ping CockroachDB: %v", err)
+	if db == nil || err != nil {
+		// If all nodes failed, try the fallback single host configuration
+		log.Printf("[db.NewCockroachClient] All cluster nodes failed, trying fallback connection to %s:%s", cfg.Host, cfg.Port)
+
+		connStr := fmt.Sprintf(
+			"postgresql://%s@%s:%s/%s?sslmode=disable",
+			cfg.User,
+			cfg.Host,
+			cfg.Port,
+			cfg.Database,
+		)
+
+		db, err = sql.Open("postgres", connStr)
+		if err != nil {
+			return nil, fmt.Errorf("[db.NewCockroachClient] Failed to connect to any CockroachDB node: %v", err)
+		}
+
+		err = db.Ping()
+		if err != nil {
+			return nil, fmt.Errorf("[db.NewCockroachClient] Failed to ping CockroachDB: %v", err)
+		}
 	}
 
 	log.Println("[db.NewCockroachClient] Successfully connected to CockroachDB!")
@@ -231,4 +274,89 @@ func (c *CockroachClient) ValidateProjectOwnership(projectID, userID uuid.UUID) 
 		return false
 	}
 	return exists
+}
+
+// HealthCheck performs a health check on the database connection
+func (c *CockroachClient) HealthCheck() error {
+	return c.Db.Ping()
+}
+
+// GetClusterStatus returns information about the CockroachDB cluster
+func (c *CockroachClient) GetClusterStatus() (map[string]interface{}, error) {
+	// Query to get cluster information
+	rows, err := c.Db.Query(`
+		SELECT 
+			node_id, 
+			address, 
+			attrs, 
+			locality, 
+			started_at,
+			updated_at,
+			status
+		FROM crdb_internal.gossip_nodes 
+		ORDER BY node_id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster status: %v", err)
+	}
+	defer rows.Close()
+
+	var nodes []map[string]interface{}
+	for rows.Next() {
+		var nodeID, address, attrs, locality, startedAt, updatedAt, status string
+		err := rows.Scan(&nodeID, &address, &attrs, &locality, &startedAt, &updatedAt, &status)
+		if err != nil {
+			log.Printf("Error scanning cluster status row: %v", err)
+			continue
+		}
+		nodes = append(nodes, map[string]interface{}{
+			"node_id":    nodeID,
+			"address":    address,
+			"attrs":      attrs,
+			"locality":   locality,
+			"started_at": startedAt,
+			"updated_at": updatedAt,
+			"status":     status,
+		})
+	}
+
+	// Get replication factor information
+	var replicationFactor int
+	err = c.Db.QueryRow("SHOW CLUSTER SETTING kv.replication.replication_factor").Scan(&replicationFactor)
+	if err != nil {
+		log.Printf("Error getting replication factor: %v", err)
+		replicationFactor = 3 // Default to 3
+	}
+
+	return map[string]interface{}{
+		"nodes":              nodes,
+		"replication_factor": replicationFactor,
+		"total_nodes":        len(nodes),
+	}, nil
+}
+
+// RetryWithBackoff executes a function with exponential backoff retry logic
+func (c *CockroachClient) RetryWithBackoff(operation func() error, maxRetries int) error {
+	var lastErr error
+	for i := 0; i < maxRetries; i++ {
+		err := operation()
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+
+		// Exponential backoff: 1s, 2s, 4s, 8s, etc.
+		backoff := time.Duration(1<<uint(i)) * time.Second
+		log.Printf("Operation failed, retrying in %v: %v", backoff, err)
+		time.Sleep(backoff)
+	}
+	return fmt.Errorf("operation failed after %d retries: %v", maxRetries, lastErr)
+}
+
+// Close closes the database connection
+func (c *CockroachClient) Close() error {
+	if c.Db != nil {
+		return c.Db.Close()
+	}
+	return nil
 }

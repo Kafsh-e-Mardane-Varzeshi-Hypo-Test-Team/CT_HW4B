@@ -15,7 +15,7 @@
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Frontend      │    │   API Gateway   │    │   Backend       │
-│   (HTML/CSS/JS) │◄──►│   (Gin Router)  │◄──►│   (Go Service)  │◄──-─────────────────────────────────────┐
+│   (HTML/CSS/JS) │◄──►│   (Gin Router)  │◄──►│   (Go Service)  │◄────────────────────────────────────────┐
 └─────────────────┘    └─────────────────┘    └─────────────────┘                                         │
                                                        │                                                  │
                                                        │                                                  │
@@ -302,27 +302,27 @@ Frontend → Go API → CockroachDB (همه چیز)
 
 ## ۶. ارزیابی طراحی
 
-### ۶.۱ Performance Testing
+### ۶.۱ تست کردن Performance
 
-#### Write Performance
+#### پرفورمنس برای کوئری‌های Write
 - **هدف**: 10,000 events/second
 - **نتایج**: 
   - Go API → Kafka: 15,000 events/second
   - Kafka → Cassandra: 12,000 events/second
   - Kafka → ClickHouse: 8,000 events/second
 
-#### Read Performance
+#### پرفورمنس برای کوئری‌های Read
 - **هدف**: Query response time < 100ms
 - **نتایج**:
   - CockroachDB user queries: 50ms
   - ClickHouse filtered queries: 80ms
   - Cassandra event queries: 120ms
 
-### ۶.۲ Scalability Testing
+### ۶.۲ تست کردن Scalability
 - **هدف**: Support 100 concurrent users
 - **نتایج**: System handles 150 concurrent users without degradation
 
-### ۶.۳ Fault Tolerance Testing
+### ۶.۳ تست کردن Fault Tolerance
 - **هدف**: System continues working with single component failure
 - **نتایج**: 
   - Kafka failure: Events queued in Go API, no data loss
@@ -330,7 +330,7 @@ Frontend → Go API → CockroachDB (همه چیز)
   - ClickHouse failure: Real-time data still available in Cassandra
   - Go API failure: Kafka buffers events, consumers continue processing
 
-### ۶.۴ Data Consistency Testing
+### ۶.۴ تست کردن Data Consistency
 - **هدف**: Event data consistency between Cassandra and ClickHouse
 - **نتایج**: 
   - 99.9% data consistency achieved

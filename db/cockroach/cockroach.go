@@ -186,3 +186,37 @@ func (c *CockroachClient) GetProjectsByUserID(userID uuid.UUID) ([]models.Projec
 
 	return projects, nil
 }
+
+// GetProjectByID retrieves a project by ID
+func (c *CockroachClient) GetProjectByID(projectID uuid.UUID) (*models.Project, error) {
+	project := &models.Project{}
+	var stringArray pq.StringArray
+
+	err := c.Db.QueryRow(
+		"SELECT id, name, user_id, api_key, searchable_keys, ttl, created_at, updated_at FROM projects WHERE id = $1",
+		projectID,
+	).Scan(&project.ID, &project.Name, &project.UserID, &project.APIKey, &stringArray, &project.TTL, &project.CreatedAt, &project.UpdatedAt)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project by ID: %v", err)
+	}
+
+	// Convert pq.StringArray back to []string
+	project.SearchableKeys = []string(stringArray)
+
+	return project, nil
+}
+
+// ValidateProjectOwnership checks if a project belongs to a specific user
+func (c *CockroachClient) ValidateProjectOwnership(projectID, userID uuid.UUID) bool {
+	var exists bool
+	err := c.Db.QueryRow(
+		"SELECT EXISTS(SELECT 1 FROM projects WHERE id = $1 AND user_id = $2)",
+		projectID, userID,
+	).Scan(&exists)
+	if err != nil {
+		log.Printf("Project ownership validation error: %v", err)
+		return false
+	}
+	return exists
+}

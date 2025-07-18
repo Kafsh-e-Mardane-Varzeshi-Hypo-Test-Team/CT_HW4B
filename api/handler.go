@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/cassandra"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/cockroach"
@@ -211,4 +213,151 @@ func (h *Handler) GetProjectsHandler(c *gin.Context) {
 		"count":    len(projects),
 	})
 	log.Printf("[api.GetProjectsHandler] Retrieved %d projects for user: %s", len(projects), userID)
+}
+
+// GetProjectHandler handles retrieving a specific project
+func (h *Handler) GetProjectHandler(c *gin.Context) {
+	projectIDStr := c.Param("id")
+	userIDStr := c.GetHeader("X-User-ID")
+
+	if userIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID required"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
+		return
+	}
+
+	projectID, err := uuid.Parse(projectIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID format"})
+		return
+	}
+
+	// Validate project ownership
+	if !h.cockroachClient.ValidateProjectOwnership(projectID, userID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	// Get project details
+	project, err := h.cockroachClient.GetProjectByID(projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve project"})
+		return
+	}
+
+	c.JSON(http.StatusOK, project)
+}
+
+// GetEventsHandler handles retrieving events for a project
+func (h *Handler) GetEventsHandler(c *gin.Context) {
+	projectIDStr := c.Param("id")
+	userIDStr := c.GetHeader("X-User-ID")
+
+	if userIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID required"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
+		return
+	}
+
+	projectID, err := uuid.Parse(projectIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID format"})
+		return
+	}
+
+	// Validate project ownership
+	if !h.cockroachClient.ValidateProjectOwnership(projectID, userID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	// Get filter keys from query parameters
+	filterKeys := []string{}
+	if keysParam := c.Query("keys"); keysParam != "" {
+		filterKeys = strings.Split(keysParam, ",")
+	}
+
+	// Get event summaries from Cassandra
+	summaries, err := h.cassandraClient.GetEventSummaries(projectID.String(), filterKeys)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve events"})
+		log.Printf("[api.GetEventsHandler] Failed to get events: %v", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"events": summaries,
+		"total":  len(summaries),
+	})
+}
+
+// GetEventDetailsHandler handles retrieving detailed event information
+func (h *Handler) GetEventDetailsHandler(c *gin.Context) {
+	projectIDStr := c.Param("id")
+	userIDStr := c.GetHeader("X-User-ID")
+
+	if userIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID required"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
+		return
+	}
+
+	projectID, err := uuid.Parse(projectIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID format"})
+		return
+	}
+
+	// Validate project ownership
+	if !h.cockroachClient.ValidateProjectOwnership(projectID, userID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	// Get query parameters
+	eventName := c.Query("name")
+	if eventName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Event name required"})
+		return
+	}
+
+	filterKeys := []string{}
+	if keysParam := c.Query("keys"); keysParam != "" {
+		filterKeys = strings.Split(keysParam, ",")
+	}
+
+	limit := 10 // Default limit
+	if limitParam := c.Query("limit"); limitParam != "" {
+		if limitVal, err := strconv.Atoi(limitParam); err == nil {
+			limit = limitVal
+		}
+	}
+
+	// Get event details from Cassandra
+	events, err := h.cassandraClient.GetEventDetails(projectID.String(), eventName, filterKeys, 0, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve event details"})
+		log.Printf("[api.GetEventDetailsHandler] Failed to get event details: %v", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"events": events,
+		"total":  len(events),
+	})
 }

@@ -10,6 +10,7 @@ type LogPayload struct {
 	Name      string    `json:"name" binding:"required"`
 	Timestamp time.Time `json:"timestamp" binding:"required"`
 	Keys      []string  `json:"keys" binding:"required"`
+	TTL       *int64    `json:"ttl,omitempty"`
 }
 
 type LogRequest struct {
@@ -27,6 +28,7 @@ type Event struct {
 	Timestamp time.Time  `json:"timestamp"`
 	Keys      []string   `json:"keys"`
 	CreatedAt time.Time  `json:"created_at"`
+	TTL       int64      `json:"ttl"`
 }
 
 // EventSummary represents aggregated event data for the frontend

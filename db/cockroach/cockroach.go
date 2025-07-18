@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/config"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/models"

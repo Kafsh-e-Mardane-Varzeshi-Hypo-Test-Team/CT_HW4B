@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS logs.events (
     project_id UUID,
     name TEXT,
     time TIMESTAMP,
+    created_at TIMESTAMP,
     keys LIST<TEXT>, 
     PRIMARY KEY ((project_id), time, event_id)
-) WITH CLUSTERING ORDER BY (time DESC)
-   AND default_time_to_live = 2592000;
+) WITH CLUSTERING ORDER BY (time DESC);
    

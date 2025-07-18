@@ -34,13 +34,12 @@ services:
       - "9042:9042"
   
   cassandra-load-keyspace:
-      container_name: cassandra-load-keyspace
       image: cassandra:latest
       depends_on:
         - cassandra
       volumes:
         - ./db/cassandra/init.cql:/init.cql
-      command: /bin/bash -c "sleep 60 && echo loading cassandra keyspace && cqlsh cassandra -f /init.cql"
+      command: /bin/bash -c "sleep 120 && echo loading cassandra keyspace && cqlsh cassandra -f /init.cql"
   
   clickhouse:
     image: clickhouse/clickhouse-server:latest
@@ -48,7 +47,7 @@ services:
       - "8123:8123"
       - "9000:9000"
     volumes:
-      - ./db/clickhouse/init.sql:/init.sql
+      - ./db/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
     environment:
       - CLICKHOUSE_DB=logs
       - CLICKHOUSE_USER=clickhouse_user

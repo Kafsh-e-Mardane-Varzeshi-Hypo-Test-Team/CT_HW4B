@@ -15,6 +15,8 @@ services:
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
     volumes:
       - "kafka_data:/bitnami"
+    mem_limit: 512m
+    cpus: 0.5
   
   cockroachdb:
     image: cockroachdb/cockroach:latest
@@ -24,23 +26,39 @@ services:
       - "8080:8080"
     volumes:
       - cockroach_data:/cockroach/cockroach-data
-
+    mem_limit: 512m
+    cpus: 0.5
+    
   cassandra:
     image: cassandra:latest
     environment:
       - CASSANDRA_USER=cassandra_user
       - CASSANDRA_PASSWORD=cassandra_password
+      - MAX_HEAP_SIZE=768M
+      - HEAP_NEWSIZE=128M
+    mem_reservation: 1g      # soft limit — JVM target usage
+    mem_limit: 2g              # hard ceiling — enforceable
     ports:
       - "9042:9042"
-  
+
   cassandra-load-keyspace:
-      image: cassandra:latest
-      depends_on:
-        - cassandra
-      volumes:
-        - ./db/cassandra/init.cql:/init.cql
-      command: /bin/bash -c "sleep 120 && echo loading cassandra keyspace && cqlsh cassandra -f /init.cql"
-  
+    image: cassandra:latest
+    depends_on:
+      - cassandra
+    volumes:
+      - ./db/cassandra/init.cql:/init.cql
+    command: >
+      /bin/bash -c '
+      until cqlsh cassandra -e "describe cluster"; do
+        echo "Waiting for Cassandra to be ready...";
+        sleep 2;
+      done;
+      echo "Cassandra is ready. Loading keyspace...";
+      cqlsh cassandra -f /init.cql
+      '
+    mem_limit: 256m
+    cpus: 0.25
+
   clickhouse:
     image: clickhouse/clickhouse-server:latest
     ports:
@@ -53,6 +71,8 @@ services:
       - CLICKHOUSE_USER=clickhouse_user
       - CLICKHOUSE_PASSWORD=clickhouse_password
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    mem_limit: 512m
+    cpus: 0.5
 
 volumes:
   kafka_data:

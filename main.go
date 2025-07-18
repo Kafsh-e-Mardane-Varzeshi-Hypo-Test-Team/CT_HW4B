@@ -65,11 +65,24 @@ func main() {
 	}
 	kafkaProducer := kafka.NewProducer(cfg.KafkaConfig)
 
-	cassandra, err := cassandra.NewCassandraClient(cfg.CassandraConfig)
-	if err != nil {
-		log.Fatalf("[main] Failed to create Cassandra client: %v", err)
+	// Initialize Cassandra client with retry logic
+	var cassandraClient *cassandra.CassandraClient
+	for i := 0; i < 5; i++ {
+		cassandraClient, err = cassandra.NewCassandraClient(cfg.CassandraConfig)
+		if err == nil {
+			break
+		}
+		log.Printf("[main] Attempt %d: Failed to connect to Cassandra cluster: %v", i+1, err)
+		if i < 4 {
+			time.Sleep(time.Duration(1<<uint(i)) * time.Second)
+		}
 	}
-	kafkaConsumerCassandra := kafka.NewConsumer(cfg.KafkaConfig, cassandra.Insert)
+
+	if err != nil {
+		log.Fatalf("[main] Failed to create Cassandra client after retries: %v", err)
+	}
+	defer cassandraClient.Close()
+	kafkaConsumerCassandra := kafka.NewConsumer(cfg.KafkaConfig, cassandraClient.Insert)
 	go kafkaConsumerCassandra.ConsumeMessages()
 
 	clickhouse, err := clickhouse.NewClickHouseClient(cfg.ClickHouseConfig)
@@ -79,7 +92,7 @@ func main() {
 	kafkaConsumerClickHouse := kafka.NewConsumer(cfg.KafkaConfig, clickhouse.Insert)
 	go kafkaConsumerClickHouse.ConsumeMessages()
 
-	handler := api.NewHandler(cockroachClient, kafkaProducer, cassandra, clickhouse)
+	handler := api.NewHandler(cockroachClient, kafkaProducer, cassandraClient, clickhouse)
 	r := gin.Default()
 
 	// Load HTML templates

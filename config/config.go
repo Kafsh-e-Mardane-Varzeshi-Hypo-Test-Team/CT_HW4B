@@ -21,11 +21,17 @@ type KafkaConfig struct {
 }
 
 type CassandraConfig struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-	Keyspace string
+	Host           string
+	Ports          []int
+	Port           int // Keep for backward compatibility
+	User           string
+	Password       string
+	Keyspace       string
+	Consistency    string
+	Timeout        int
+	NumConns       int
+	ConnectTimeout int
+	QueryTimeout   int
 }
 
 type ClickHouseConfig struct {
@@ -65,20 +71,33 @@ func Load() *Config {
 	// Parse CockroachDB ports from environment variable
 	cockroachPorts := getEnv("COCKROACHDB_PORTS", "26257,26258,26259")
 	portStrings := strings.Split(cockroachPorts, ",")
-	var ports []int
+	var cockroachPortsList []int
 	for _, portStr := range portStrings {
 		port, err := strconv.Atoi(strings.TrimSpace(portStr))
 		if err != nil {
 			log.Printf("[config.Load] Invalid port in COCKROACHDB_PORTS: %s, skipping", portStr)
 			continue
 		}
-		ports = append(ports, port)
+		cockroachPortsList = append(cockroachPortsList, port)
+	}
+
+	// Parse Cassandra ports from environment variable
+	cassandraPortsStr := getEnv("CASSANDRA_PORTS", "9042,9043,9044")
+	cassandraPortStrings := strings.Split(cassandraPortsStr, ",")
+	var cassandraPorts []int
+	for _, portStr := range cassandraPortStrings {
+		port, err := strconv.Atoi(strings.TrimSpace(portStr))
+		if err != nil {
+			log.Printf("[config.Load] Invalid port in CASSANDRA_PORTS: %s, skipping", portStr)
+			continue
+		}
+		cassandraPorts = append(cassandraPorts, port)
 	}
 
 	cfg := &Config{
 		CockroachDBConfig: CockroachDBConfig{
 			Host:     getEnv("COCKROACHDB_HOST", "localhost"),
-			Ports:    ports,
+			Ports:    cockroachPortsList,
 			Port:     getEnv("COCKROACHDB_PORT", "26257"),
 			User:     getEnv("COCKROACHDB_USER", "root"),
 			Database: getEnv("COCKROACHDB_DATABASE", "logs"),
@@ -88,11 +107,17 @@ func Load() *Config {
 			Topic:  getEnv("KAFKA_TOPIC", "raw_logs"),
 		},
 		CassandraConfig: CassandraConfig{
-			Host:     getEnv("CASSANDRA_HOST", "localhost"),
-			Port:     cassandraPort,
-			User:     getEnv("CASSANDRA_USER", "cassandra_user"),
-			Password: getEnv("CASSANDRA_PASSWORD", "cassandra_password"),
-			Keyspace: getEnv("CASSANDRA_KEYSPACE", "logs"),
+			Host:           getEnv("CASSANDRA_HOST", "localhost"),
+			Ports:          cassandraPorts,
+			Port:           cassandraPort,
+			User:           getEnv("CASSANDRA_USER", "cassandra_user"),
+			Password:       getEnv("CASSANDRA_PASSWORD", "cassandra_password"),
+			Keyspace:       getEnv("CASSANDRA_KEYSPACE", "logs"),
+			Consistency:    getEnv("CASSANDRA_CONSISTENCY", "quorum"),
+			Timeout:        getTimeout(getEnv("CASSANDRA_TIMEOUT", "5")),
+			NumConns:       getNumConns(getEnv("CASSANDRA_NUM_CONNS", "10")),
+			ConnectTimeout: getTimeout(getEnv("CASSANDRA_CONNECT_TIMEOUT", "5")),
+			QueryTimeout:   getTimeout(getEnv("CASSANDRA_QUERY_TIMEOUT", "5")),
 		},
 		ClickHouseConfig: ClickHouseConfig{
 			Host:     getEnv("CLICKHOUSE_HOST", "localhost"),
@@ -103,4 +128,22 @@ func Load() *Config {
 		},
 	}
 	return cfg
+}
+
+func getTimeout(value string) int {
+	timeout, err := strconv.Atoi(value)
+	if err != nil {
+		log.Printf("[config.getTimeout] Invalid timeout value: %s, using default: 5", value)
+		return 5
+	}
+	return timeout
+}
+
+func getNumConns(value string) int {
+	numConns, err := strconv.Atoi(value)
+	if err != nil {
+		log.Printf("[config.getNumConns] Invalid num_conns value: %s, using default: 10", value)
+		return 10
+	}
+	return numConns
 }

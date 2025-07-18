@@ -60,35 +60,98 @@ services:
       - cockroach-network
     restart: "no"
     
-  cassandra:
+  cassandra-1:
     image: cassandra:latest
     environment:
+      - CASSANDRA_CLUSTER_NAME=my_cluster
+      - CASSANDRA_DC=datacenter1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_SEEDS=cassandra-1,cassandra-2,cassandra-3
+      - CASSANDRA_LISTEN_ADDRESS=cassandra-1
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra-1
+      - CASSANDRA_RPC_ADDRESS=cassandra-1
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra-1
       - CASSANDRA_USER=cassandra_user
       - CASSANDRA_PASSWORD=cassandra_password
       - MAX_HEAP_SIZE=768M
       - HEAP_NEWSIZE=128M
-    mem_reservation: 1g      # soft limit — JVM target usage
-    mem_limit: 2g              # hard ceiling — enforceable
+    mem_reservation: 1g
+    mem_limit: 2g
     ports:
       - "9042:9042"
+    networks:
+      - cassandra-network
+
+  cassandra-2:
+    image: cassandra:latest
+    environment:
+      - CASSANDRA_CLUSTER_NAME=my_cluster
+      - CASSANDRA_DC=datacenter1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_SEEDS=cassandra-1,cassandra-2,cassandra-3
+      - CASSANDRA_LISTEN_ADDRESS=cassandra-2
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra-2
+      - CASSANDRA_RPC_ADDRESS=cassandra-2
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra-2
+      - CASSANDRA_USER=cassandra_user
+      - CASSANDRA_PASSWORD=cassandra_password
+      - MAX_HEAP_SIZE=768M
+      - HEAP_NEWSIZE=128M
+    mem_reservation: 1g
+    mem_limit: 2g
+    ports:
+      - "9043:9042"
+    depends_on:
+      - cassandra-1
+    networks:
+      - cassandra-network
+
+  cassandra-3:
+    image: cassandra:latest
+    environment:
+      - CASSANDRA_CLUSTER_NAME=my_cluster
+      - CASSANDRA_DC=datacenter1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_SEEDS=cassandra-1,cassandra-2,cassandra-3
+      - CASSANDRA_LISTEN_ADDRESS=cassandra-3
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra-3
+      - CASSANDRA_RPC_ADDRESS=cassandra-3
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra-3
+      - CASSANDRA_USER=cassandra_user
+      - CASSANDRA_PASSWORD=cassandra_password
+      - MAX_HEAP_SIZE=768M
+      - HEAP_NEWSIZE=128M
+    mem_reservation: 1g
+    mem_limit: 2g
+    ports:
+      - "9044:9042"
+    depends_on:
+      - cassandra-1
+      - cassandra-2
+    networks:
+      - cassandra-network
 
   cassandra-load-keyspace:
     image: cassandra:latest
     depends_on:
-      - cassandra
+      - cassandra-1
+      - cassandra-2
+      - cassandra-3
     volumes:
       - ./db/cassandra/init.cql:/init.cql
     command: >
       /bin/bash -c '
-      until cqlsh cassandra -e "describe cluster"; do
-        echo "Waiting for Cassandra to be ready...";
-        sleep 2;
+      until cqlsh cassandra-1 -e "describe cluster"; do
+        echo "Waiting for Cassandra cluster to be ready...";
+        sleep 5;
       done;
-      echo "Cassandra is ready. Loading keyspace...";
-      cqlsh cassandra -f /init.cql
+      echo "Cassandra cluster is ready. Loading keyspace...";
+      cqlsh cassandra-1 -f /init.cql
       '
     mem_limit: 256m
     cpus: 0.25
+    networks:
+      - cassandra-network
 
   clickhouse:
     image: clickhouse/clickhouse-server:latest
@@ -107,4 +170,6 @@ services:
 
 networks:
   cockroach-network:
+    driver: bridge
+  cassandra-network:
     driver: bridge

@@ -1,7 +1,7 @@
 CREATE KEYSPACE IF NOT EXISTS logs 
 WITH replication = {
   'class': 'SimpleStrategy',
-  'replication_factor': 1
+  'replication_factor': 3
 };
 
 USE logs;

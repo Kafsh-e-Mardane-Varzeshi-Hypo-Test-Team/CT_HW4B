@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/config"
@@ -16,21 +17,66 @@ type CassandraClient struct {
 }
 
 func NewCassandraClient(cfg config.CassandraConfig) (*CassandraClient, error) {
-	cluster := gocql.NewCluster(cfg.Host)
-	cluster.Port = cfg.Port
+	// Create cluster configuration with single host and multiple ports
+	var hosts []string
+	for _, port := range cfg.Ports {
+		hosts = append(hosts, fmt.Sprintf("%s:%d", cfg.Host, port))
+	}
+
+	cluster := gocql.NewCluster(hosts...)
 	cluster.Keyspace = cfg.Keyspace
+
+	// Authentication
 	cluster.Authenticator = gocql.PasswordAuthenticator{
 		Username: cfg.User,
 		Password: cfg.Password,
 	}
+
+	// Performance optimizations
+	cluster.Consistency = getConsistencyLevel(cfg.Consistency)
+	cluster.Timeout = time.Duration(cfg.Timeout) * time.Second
+	cluster.ConnectTimeout = time.Duration(cfg.ConnectTimeout) * time.Second
+
+	// Connection pooling
+	cluster.NumConns = cfg.NumConns
+
+	// Load balancing and retry policies
+	cluster.RetryPolicy = &gocql.ExponentialBackoffRetryPolicy{
+		NumRetries: 3,
+		Min:        time.Millisecond * 100,
+		Max:        time.Second * 2,
+	}
+
+	// Use token-aware routing for better performance
+	cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
+
+	// Enable compression for better network performance
+	cluster.Compressor = gocql.SnappyCompressor{}
 
 	session, err := cluster.CreateSession()
 	if err != nil {
 		return nil, fmt.Errorf("[cassandra.NewCassandraClient] Failed to create Cassandra session: %v", err)
 	}
 
-	log.Println("Successfully connected to Cassandra!")
+	log.Printf("Successfully connected to Cassandra cluster with hosts: %s", strings.Join(hosts, ", "))
 	return &CassandraClient{Session: session}, nil
+}
+
+func getConsistencyLevel(consistency string) gocql.Consistency {
+	switch strings.ToLower(consistency) {
+	case "one":
+		return gocql.One
+	case "quorum":
+		return gocql.Quorum
+	case "all":
+		return gocql.All
+	case "local_quorum":
+		return gocql.LocalQuorum
+	case "each_quorum":
+		return gocql.EachQuorum
+	default:
+		return gocql.Quorum // Default to quorum for good balance of consistency and performance
+	}
 }
 
 func (c *CassandraClient) Insert(event models.LogRequest) error {
@@ -42,9 +88,15 @@ func (c *CassandraClient) Insert(event models.LogRequest) error {
 		keys
 	) VALUES (?, ?, ?, ?, ?)`
 
-	err := c.Session.Query(query, event.EventID,
+	// Use prepared statement for better performance
+	stmt := c.Session.Query(query, event.EventID,
 		event.ProjectID, event.Payload.Name, event.Payload.Timestamp,
-		event.Payload.Keys).Exec()
+		event.Payload.Keys)
+
+	// Set consistency level for write operations
+	stmt.SetConsistency(gocql.Quorum)
+
+	err := stmt.Exec()
 	if err != nil {
 		return fmt.Errorf("[cassandra.Insert] Failed to insert event: %v", err)
 	}
@@ -85,8 +137,14 @@ func (c *CassandraClient) GetEventDetails(projectID, eventName string, filterKey
 		baseQuery += " ORDER BY time DESC"
 	}
 
-	// Set a reasonable fetch size to avoid loading too much data
-	iter := c.Session.Query(baseQuery, args...).PageSize(1000).Iter()
+	// Create query with performance optimizations
+	stmt := c.Session.Query(baseQuery, args...)
+
+	// Set consistency level for read operations (can be more relaxed for better performance)
+	stmt.SetConsistency(gocql.LocalQuorum)
+
+	// Set page size for efficient pagination
+	iter := stmt.PageSize(1000).Iter()
 	defer iter.Close()
 
 	var events []models.Event
@@ -158,4 +216,46 @@ func (c *CassandraClient) GetEventDetails(projectID, eventName string, filterKey
 	}
 
 	return events[offset:end], nil
+}
+
+// Close closes the Cassandra session
+func (c *CassandraClient) Close() {
+	if c.Session != nil {
+		c.Session.Close()
+	}
+}
+
+// BatchInsert inserts multiple events in a single batch for better performance
+func (c *CassandraClient) BatchInsert(events []models.LogRequest) error {
+	if len(events) == 0 {
+		return nil
+	}
+
+	// Create batch for better performance
+	batch := c.Session.NewBatch(gocql.LoggedBatch)
+
+	query := `INSERT INTO logs.events (
+		event_id,
+		project_id,
+		name,
+		time,
+		keys
+	) VALUES (?, ?, ?, ?, ?)`
+
+	for _, event := range events {
+		batch.Query(query, event.EventID,
+			event.ProjectID, event.Payload.Name, event.Payload.Timestamp,
+			event.Payload.Keys)
+	}
+
+	// Set consistency level for batch operations
+	batch.SetConsistency(gocql.Quorum)
+
+	err := c.Session.ExecuteBatch(batch)
+	if err != nil {
+		return fmt.Errorf("[cassandra.BatchInsert] Failed to insert batch of %d events: %v", len(events), err)
+	}
+
+	log.Printf("[cassandra.BatchInsert] Successfully inserted batch of %d events", len(events))
+	return nil
 }

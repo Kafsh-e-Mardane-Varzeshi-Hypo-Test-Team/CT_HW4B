@@ -13,7 +13,7 @@ type LogPayload struct {
 }
 
 type LogRequest struct {
-	EventID   gocql.UUID     `json:"event_id" binding:"required"`
+	EventID   gocql.UUID     `json:"event_id"`
 	ProjectID string     `json:"project_id" binding:"required"`
 	APIKey    string     `json:"api_key" binding:"required"`
 	Payload   LogPayload `json:"payload" binding:"required"`

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 
+	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/config"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/models"
 )

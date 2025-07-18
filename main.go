@@ -37,12 +37,12 @@ func main() {
 	kafkaConsumerCassandra := kafka.NewConsumer(cfg.KafkaConfig, cassandra.Insert)
 	go kafkaConsumerCassandra.ConsumeMessages()
 
-    clickhouse, err := clickhouse.NewClickHouseClient(cfg.ClickHouseConfig)
-    if err != nil {
-        log.Fatalf("[main] Failed to create ClickHouse client: %v", err)
-    }
-    kafkaConsumerClickHouse := kafka.NewConsumer(cfg.KafkaConfig, clickhouse.Insert)
-    go kafkaConsumerClickHouse.ConsumeMessages()
+	clickhouse, err := clickhouse.NewClickHouseClient(cfg.ClickHouseConfig)
+	if err != nil {
+		log.Fatalf("[main] Failed to create ClickHouse client: %v", err)
+	}
+	kafkaConsumerClickHouse := kafka.NewConsumer(cfg.KafkaConfig, clickhouse.Insert)
+	go kafkaConsumerClickHouse.ConsumeMessages()
 
 	handler := api.NewHandler(cockroach, kafkaProducer, cassandra)
 	r := gin.Default()

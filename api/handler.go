@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/cassandra"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/clickhouse"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/cockroach"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/db/kafka"
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/models"
@@ -18,16 +19,18 @@ import (
 )
 
 type Handler struct {
-	cockroachClient *cockroach.CockroachClient
-	kafkaProducer   *kafka.Producer
-	cassandraClient *cassandra.CassandraClient
+	cockroachClient  *cockroach.CockroachClient
+	kafkaProducer    *kafka.Producer
+	cassandraClient  *cassandra.CassandraClient
+	clickhouseClient *clickhouse.ClickHouseClient
 }
 
-func NewHandler(cockroachClient *cockroach.CockroachClient, kafkaProducer *kafka.Producer, cassandraClient *cassandra.CassandraClient) *Handler {
+func NewHandler(cockroachClient *cockroach.CockroachClient, kafkaProducer *kafka.Producer, cassandraClient *cassandra.CassandraClient, clickhouseClient *clickhouse.ClickHouseClient) *Handler {
 	return &Handler{
-		cockroachClient: cockroachClient,
-		cassandraClient: cassandraClient,
-		kafkaProducer:   kafkaProducer,
+		cockroachClient:  cockroachClient,
+		cassandraClient:  cassandraClient,
+		clickhouseClient: clickhouseClient,
+		kafkaProducer:    kafkaProducer,
 	}
 }
 
@@ -287,8 +290,8 @@ func (h *Handler) GetEventsHandler(c *gin.Context) {
 		filterKeys = strings.Split(keysParam, ",")
 	}
 
-	// Get event summaries from Cassandra
-	summaries, err := h.cassandraClient.GetEventSummaries(projectID.String(), filterKeys)
+	// Get event summaries from ClickHouse (much faster for aggregations)
+	summaries, err := h.clickhouseClient.GetEventSummaries(projectID.String(), filterKeys)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve events"})
 		log.Printf("[api.GetEventsHandler] Failed to get events: %v", err)
@@ -341,6 +344,13 @@ func (h *Handler) GetEventDetailsHandler(c *gin.Context) {
 		filterKeys = strings.Split(keysParam, ",")
 	}
 
+	offset := 0
+	if offsetParam := c.Query("offset"); offsetParam != "" {
+		if offsetVal, err := strconv.Atoi(offsetParam); err == nil {
+			offset = offsetVal
+		}
+	}
+
 	limit := 10 // Default limit
 	if limitParam := c.Query("limit"); limitParam != "" {
 		if limitVal, err := strconv.Atoi(limitParam); err == nil {
@@ -348,8 +358,8 @@ func (h *Handler) GetEventDetailsHandler(c *gin.Context) {
 		}
 	}
 
-	// Get event details from Cassandra
-	events, err := h.cassandraClient.GetEventDetails(projectID.String(), eventName, filterKeys, 0, limit)
+	// Get event details from ClickHouse (supports proper OFFSET/LIMIT)
+	events, err := h.clickhouseClient.GetEventDetails(projectID.String(), eventName, filterKeys, offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve event details"})
 		log.Printf("[api.GetEventDetailsHandler] Failed to get event details: %v", err)

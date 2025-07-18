@@ -6,6 +6,10 @@ let currentEvents = [];
 let currentEventIndex = 0;
 let currentEventDetails = [];
 let selectedKeys = [];
+let currentEventName = '';
+let currentEventOffset = 0;
+let currentEventLimit = 10;
+let hasMoreEvents = false;
 
 // Check authentication and load project data
 document.addEventListener('DOMContentLoaded', function() {
@@ -233,8 +237,16 @@ async function openEventDetails(eventName) {
     console.log('Opening event details for:', eventName);
     
     try {
+        // Reset pagination state
+        currentEventIndex = 0;
+        currentEventOffset = 0;
+        currentEventName = eventName;
+        hasMoreEvents = false;
+        
         const params = new URLSearchParams();
         params.append('name', eventName);
+        params.append('limit', currentEventLimit.toString());
+        params.append('offset', currentEventOffset.toString());
         if (selectedKeys.length > 0) {
             params.append('keys', selectedKeys.join(','));
         }
@@ -247,8 +259,8 @@ async function openEventDetails(eventName) {
         
         if (response.ok) {
             const result = await response.json();
-            currentEventIndex = 0;
-            currentEventDetails = result.events || []; // Store the events for navigation
+            currentEventDetails = result.events || [];
+            hasMoreEvents = currentEventDetails.length === currentEventLimit;
             displayEventDetails(currentEventDetails, eventName);
             document.getElementById('eventModal').style.display = 'block';
         } else {
@@ -305,19 +317,66 @@ function displayEventDetails(events, eventName) {
 function previousEvent() {
     if (currentEventIndex > 0) {
         currentEventIndex--;
-        const eventName = document.getElementById('eventModalTitle').textContent.replace('Event: ', '');
-        displayEventDetails(currentEventDetails, eventName);
+        displayEventDetails(currentEventDetails, currentEventName);
     }
 }
 
 // Navigate to next event
-function nextEvent() {
+async function nextEvent() {
     if (currentEventIndex < currentEventDetails.length - 1) {
         currentEventIndex++;
-        const eventName = document.getElementById('eventModalTitle').textContent.replace('Event: ', '');
-        displayEventDetails(currentEventDetails, eventName);
+        displayEventDetails(currentEventDetails, currentEventName);
+    } else if (hasMoreEvents) {
+        // Load more events from ClickHouse
+        await loadMoreEvents();
     } else {
         alert('No more events');
+    }
+}
+
+// Load more events from ClickHouse
+async function loadMoreEvents() {
+    try {
+        currentEventOffset += currentEventLimit;
+        
+        const params = new URLSearchParams();
+        params.append('name', currentEventName);
+        params.append('limit', currentEventLimit.toString());
+        params.append('offset', currentEventOffset.toString());
+        if (selectedKeys.length > 0) {
+            params.append('keys', selectedKeys.join(','));
+        }
+        
+        const response = await fetch(`/api/projects/${currentProject.id}/events/details?${params}`, {
+            headers: {
+                'X-User-ID': currentUser.id
+            }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            const newEvents = result.events || [];
+            
+            if (newEvents.length > 0) {
+                // Append new events to existing ones
+                currentEventDetails = currentEventDetails.concat(newEvents);
+                hasMoreEvents = newEvents.length === currentEventLimit;
+                
+                // Move to the first new event
+                currentEventIndex = currentEventDetails.length - newEvents.length;
+                displayEventDetails(currentEventDetails, currentEventName);
+            } else {
+                hasMoreEvents = false;
+                alert('No more events');
+            }
+        } else {
+            const errorData = await response.json();
+            console.error('Error loading more events:', errorData);
+            alert('Error loading more events: ' + (errorData.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error loading more events:', error);
+        alert('Error loading more events: ' + error.message);
     }
 }
 

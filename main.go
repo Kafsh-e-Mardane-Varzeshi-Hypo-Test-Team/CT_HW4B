@@ -45,7 +45,7 @@ func main() {
 	kafkaConsumerClickHouse := kafka.NewConsumer(cfg.KafkaConfig, clickhouse.Insert)
 	go kafkaConsumerClickHouse.ConsumeMessages()
 
-	handler := api.NewHandler(cockroach, kafkaProducer, cassandra)
+	handler := api.NewHandler(cockroach, kafkaProducer, cassandra, clickhouse)
 	r := gin.Default()
 
 	// Load HTML templates

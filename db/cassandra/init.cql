@@ -17,3 +17,4 @@ CREATE TABLE IF NOT EXISTS logs.events (
     PRIMARY KEY ((project_id), time, event_id)
 ) WITH CLUSTERING ORDER BY (time DESC);
    
+CREATE INDEX IF NOT EXISTS ON logs.events (name);

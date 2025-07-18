@@ -358,8 +358,8 @@ func (h *Handler) GetEventDetailsHandler(c *gin.Context) {
 		}
 	}
 
-	// Get event details from ClickHouse (supports proper OFFSET/LIMIT)
-	events, err := h.clickhouseClient.GetEventDetails(projectID.String(), eventName, filterKeys, offset, limit)
+	// Get event details from Cassandra
+	events, err := h.cassandraClient.GetEventDetails(projectID.String(), eventName, filterKeys, offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve event details"})
 		log.Printf("[api.GetEventDetailsHandler] Failed to get event details: %v", err)

@@ -4,10 +4,14 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/config"
+	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/models"
 )
 
 type CockroachClient struct {
@@ -46,7 +50,9 @@ func (c *CockroachClient) LoadSchema(cfg config.CockroachDBConfig) error {
 	_, err = c.Db.Exec(`CREATE TABLE IF NOT EXISTS users (
 							id UUID PRIMARY KEY,
 							username STRING UNIQUE,
-							password STRING
+							password STRING,
+							created_at TIMESTAMP DEFAULT NOW(),
+							updated_at TIMESTAMP DEFAULT NOW()
 						);
 
 						CREATE TABLE IF NOT EXISTS projects (
@@ -55,7 +61,9 @@ func (c *CockroachClient) LoadSchema(cfg config.CockroachDBConfig) error {
 							user_id UUID REFERENCES users(id),
 							api_key STRING UNIQUE,
 							searchable_keys STRING[],
-							ttl INTERVAL
+							ttl INTERVAL,
+							created_at TIMESTAMP DEFAULT NOW(),
+							updated_at TIMESTAMP DEFAULT NOW()
 						);
 						`)
 	if err != nil {
@@ -75,4 +83,106 @@ func (c *CockroachClient) ValidateAPIKey(apiKey, projectID string) bool {
 		log.Printf("API key validation error: %v", err)
 	}
 	return valid
+}
+
+// CreateUser creates a new user in the database
+func (c *CockroachClient) CreateUser(username, hashedPassword string) (*models.User, error) {
+	user := &models.User{
+		ID:        uuid.New(),
+		Username:  username,
+		Password:  hashedPassword,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	_, err := c.Db.Exec(
+		"INSERT INTO users (id, username, password, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)",
+		user.ID, user.Username, user.Password, user.CreatedAt, user.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user: %v", err)
+	}
+
+	return user, nil
+}
+
+// GetUserByUsername retrieves a user by username
+func (c *CockroachClient) GetUserByUsername(username string) (*models.User, error) {
+	user := &models.User{}
+	err := c.Db.QueryRow(
+		"SELECT id, username, password, created_at, updated_at FROM users WHERE username = $1",
+		username,
+	).Scan(&user.ID, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user by username: %v", err)
+	}
+	return user, nil
+}
+
+// UserExists checks if a user with the given username exists
+func (c *CockroachClient) UserExists(username string) bool {
+	var exists bool
+	err := c.Db.QueryRow(
+		"SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)",
+		username,
+	).Scan(&exists)
+	if err != nil {
+		log.Printf("User existence check error: %v", err)
+		return false
+	}
+	return exists
+}
+
+// CreateProject creates a new project for a user
+func (c *CockroachClient) CreateProject(userID uuid.UUID, name string, searchableKeys []string, ttl *string) (*models.Project, error) {
+	project := &models.Project{
+		ID:             uuid.New(),
+		Name:           name,
+		UserID:         userID,
+		APIKey:         uuid.New().String(), // Generate a unique API key
+		SearchableKeys: searchableKeys,
+		TTL:            ttl,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+
+	// Convert []string to pq.StringArray for CockroachDB compatibility
+	stringArray := pq.StringArray(searchableKeys)
+
+	_, err := c.Db.Exec(
+		"INSERT INTO projects (id, name, user_id, api_key, searchable_keys, ttl, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+		project.ID, project.Name, project.UserID, project.APIKey, stringArray, project.TTL, project.CreatedAt, project.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create project: %v", err)
+	}
+
+	return project, nil
+}
+
+// GetProjectsByUserID retrieves all projects for a user
+func (c *CockroachClient) GetProjectsByUserID(userID uuid.UUID) ([]models.Project, error) {
+	rows, err := c.Db.Query(
+		"SELECT id, name, user_id, api_key, searchable_keys, ttl, created_at, updated_at FROM projects WHERE user_id = $1",
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get projects by user ID: %v", err)
+	}
+	defer rows.Close()
+
+	var projects []models.Project
+	for rows.Next() {
+		var project models.Project
+		var stringArray pq.StringArray
+		err := rows.Scan(&project.ID, &project.Name, &project.UserID, &project.APIKey, &stringArray, &project.TTL, &project.CreatedAt, &project.UpdatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan project: %v", err)
+		}
+		// Convert pq.StringArray back to []string
+		project.SearchableKeys = []string(stringArray)
+		projects = append(projects, project)
+	}
+
+	return projects, nil
 }

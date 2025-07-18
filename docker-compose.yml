@@ -13,8 +13,6 @@ services:
       - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-    volumes:
-      - "kafka_data:/bitnami"
     mem_limit: 512m
     cpus: 0.5
   
@@ -24,8 +22,6 @@ services:
     ports:
       - "26257:26257"
       - "8080:8080"
-    volumes:
-      - cockroach_data:/cockroach/cockroach-data
     mem_limit: 512m
     cpus: 0.5
     
@@ -73,9 +69,3 @@ services:
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
     mem_limit: 512m
     cpus: 0.5
-
-volumes:
-  kafka_data:
-    driver: local
-  cockroach_data:
-    driver: local

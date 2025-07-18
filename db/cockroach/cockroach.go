@@ -119,6 +119,19 @@ func (c *CockroachClient) GetUserByUsername(username string) (*models.User, erro
 	return user, nil
 }
 
+// GetUserByID retrieves a user by ID
+func (c *CockroachClient) GetUserByID(userID uuid.UUID) (*models.User, error) {
+	user := &models.User{}
+	err := c.Db.QueryRow(
+		"SELECT id, username, password, created_at, updated_at FROM users WHERE id = $1",
+		userID,
+	).Scan(&user.ID, &user.Username, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user by ID: %v", err)
+	}
+	return user, nil
+}
+
 // UserExists checks if a user with the given username exists
 func (c *CockroachClient) UserExists(username string) bool {
 	var exists bool

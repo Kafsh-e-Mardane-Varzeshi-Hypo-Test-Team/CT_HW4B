@@ -371,3 +371,32 @@ func (h *Handler) GetEventDetailsHandler(c *gin.Context) {
 		"total":  len(events),
 	})
 }
+
+// ValidateSessionHandler validates if a user session is still valid
+func (h *Handler) ValidateSessionHandler(c *gin.Context) {
+	userIDStr := c.GetHeader("X-User-ID")
+	if userIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID required"})
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID format"})
+		return
+	}
+
+	// Check if user exists in database
+	user, err := h.cockroachClient.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid session"})
+		log.Printf("[api.ValidateSessionHandler] User not found: %s", userID)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"valid": true,
+		"user":  user,
+	})
+	log.Printf("[api.ValidateSessionHandler] Session validated for user: %s", user.Username)
+}

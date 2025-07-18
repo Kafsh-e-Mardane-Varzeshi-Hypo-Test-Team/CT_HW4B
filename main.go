@@ -74,6 +74,7 @@ func main() {
 	// API routes
 	r.POST("/api/signup", handler.SignupHandler)
 	r.POST("/api/login", handler.LoginHandler)
+	r.POST("/api/validate-session", handler.ValidateSessionHandler)
 	r.POST("/api/projects", handler.CreateProjectHandler)
 	r.GET("/api/projects", handler.GetProjectsHandler)
 	r.GET("/api/projects/:id", handler.GetProjectHandler)

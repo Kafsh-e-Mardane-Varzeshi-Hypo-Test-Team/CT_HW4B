@@ -64,6 +64,7 @@ func main() {
 		log.Fatalf("[main] Failed to create Kafka topic: %v", err)
 	}
 	kafkaProducer := kafka.NewProducer(cfg.KafkaConfig)
+	defer kafkaProducer.Close()
 
 	// Initialize Cassandra client with retry logic
 	var cassandraClient *cassandra.CassandraClient
@@ -82,15 +83,17 @@ func main() {
 		log.Fatalf("[main] Failed to create Cassandra client after retries: %v", err)
 	}
 	defer cassandraClient.Close()
-	kafkaConsumerCassandra := kafka.NewConsumer(cfg.KafkaConfig, cassandraClient.Insert)
+	kafkaConsumerCassandra := kafka.NewConsumer(cfg.KafkaConfig, cassandraClient.Insert, cfg.CassandraConfig.ConsumerGroupId)
 	go kafkaConsumerCassandra.ConsumeMessages()
+	defer kafkaConsumerCassandra.Close()
 
 	clickhouse, err := clickhouse.NewClickHouseClient(cfg.ClickHouseConfig)
 	if err != nil {
 		log.Fatalf("[main] Failed to create ClickHouse client: %v", err)
 	}
-	kafkaConsumerClickHouse := kafka.NewConsumer(cfg.KafkaConfig, clickhouse.Insert)
+	kafkaConsumerClickHouse := kafka.NewConsumer(cfg.KafkaConfig, clickhouse.Insert, cfg.ClickHouseConfig.ConsumerGroupId)
 	go kafkaConsumerClickHouse.ConsumeMessages()
+	defer kafkaConsumerClickHouse.Close()
 
 	handler := api.NewHandler(cockroachClient, kafkaProducer, cassandraClient, clickhouse)
 	r := gin.Default()
@@ -175,6 +178,9 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatal("[main] Server forced to shutdown:", err)
 	}
+
+	kafkaConsumerCassandra.Close()
+	kafkaConsumerClickHouse.Close()
 
 	log.Println("[main] Server exited")
 }

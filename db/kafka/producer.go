@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/Kafsh-e-Mardane-Varzeshi-Hypo-Test-Team/CT_HW4B/config"
 	"github.com/segmentio/kafka-go"
@@ -11,23 +12,36 @@ import (
 
 type Producer struct {
 	writer *kafka.Writer
+	topic  string
 }
 
 func NewProducer(cfg config.KafkaConfig) *Producer {
+	if len(cfg.Brokers) == 0 {
+		log.Fatal("[kafka.NewProducer] No brokers provided in config")
+	}
+
 	writer := &kafka.Writer{
-		Addr:         kafka.TCP(cfg.Broker),
+		Addr:         kafka.TCP(cfg.Brokers...),
 		Topic:        cfg.Topic,
 		Balancer:     &kafka.LeastBytes{},
 		BatchSize:    1, // Send messages immediately
 		RequiredAcks: kafka.RequireOne,
+		Async:        false,
+		Compression:  kafka.Snappy,
 	}
 
-	log.Printf("[kafka.NewProducer] Successfully connected to Kafka! Broker: %s, Topic: %s", cfg.Broker, cfg.Topic)
-	return &Producer{writer: writer}
+	log.Printf("[kafka.NewProducer] Successfully connected to Kafka! Brokers: %s, Topic: %s", cfg.Brokers, cfg.Topic)
+	return &Producer{
+		writer: writer,
+		topic:  cfg.Topic,
+	}
 }
 
-func (p *Producer) ProduceMessage(message []byte) error {
-	err := p.writer.WriteMessages(context.Background(), kafka.Message{
+func (p *Producer) ProduceMessage(ctx context.Context, message []byte) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	err := p.writer.WriteMessages(ctx, kafka.Message{
 		Value: message,
 	})
 	if err != nil {
@@ -35,4 +49,9 @@ func (p *Producer) ProduceMessage(message []byte) error {
 	}
 
 	return nil
+}
+
+func (p *Producer) Close() error {
+	log.Printf("[kafka.Producer] Closing writer for topic=%q", p.topic)
+	return p.writer.Close()
 }

@@ -16,30 +16,32 @@ type CockroachDBConfig struct {
 }
 
 type KafkaConfig struct {
-	Broker string
-	Topic  string
+	Brokers []string
+	Topic   string
 }
 
 type CassandraConfig struct {
-	Host           string
-	Ports          []int
-	Port           int // Keep for backward compatibility
-	User           string
-	Password       string
-	Keyspace       string
-	Consistency    string
-	Timeout        int
-	NumConns       int
-	ConnectTimeout int
-	QueryTimeout   int
+	Host            string
+	Ports           []int
+	Port            int // Keep for backward compatibility
+	User            string
+	Password        string
+	Keyspace        string
+	Consistency     string
+	Timeout         int
+	NumConns        int
+	ConnectTimeout  int
+	QueryTimeout    int
+	ConsumerGroupId string
 }
 
 type ClickHouseConfig struct {
-	Host     string
-	Port     int
-	Username string
-	Password string
-	Database string
+	Host            string
+	Port            int
+	Username        string
+	Password        string
+	Database        string
+	ConsumerGroupId string
 }
 
 type Config struct {
@@ -94,6 +96,17 @@ func Load() *Config {
 		cassandraPorts = append(cassandraPorts, port)
 	}
 
+	// Parse Kafka ports from environment variable
+	kafkaBrokersStr := getEnv("KAFKA_BROKERS", "localhost:9092,localhost:9093,localhost:9094")
+	kafkaBrokerStrings := strings.Split(kafkaBrokersStr, ",")
+	var kafkaBrokers []string
+	for _, b := range kafkaBrokerStrings {
+		broker := strings.TrimSpace(b)
+		if broker != "" {
+			kafkaBrokers = append(kafkaBrokers, broker)
+		}
+	}
+
 	cfg := &Config{
 		CockroachDBConfig: CockroachDBConfig{
 			Host:     getEnv("COCKROACHDB_HOST", "localhost"),
@@ -103,28 +116,30 @@ func Load() *Config {
 			Database: getEnv("COCKROACHDB_DATABASE", "logs"),
 		},
 		KafkaConfig: KafkaConfig{
-			Broker: getEnv("KAFKA_BROKER", "localhost:9092"),
-			Topic:  getEnv("KAFKA_TOPIC", "raw_logs"),
+			Brokers: kafkaBrokers,
+			Topic:   getEnv("KAFKA_TOPIC", "raw_logs"),
 		},
 		CassandraConfig: CassandraConfig{
-			Host:           getEnv("CASSANDRA_HOST", "localhost"),
-			Ports:          cassandraPorts,
-			Port:           cassandraPort,
-			User:           getEnv("CASSANDRA_USER", "cassandra_user"),
-			Password:       getEnv("CASSANDRA_PASSWORD", "cassandra_password"),
-			Keyspace:       getEnv("CASSANDRA_KEYSPACE", "logs"),
-			Consistency:    getEnv("CASSANDRA_CONSISTENCY", "quorum"),
-			Timeout:        getTimeout(getEnv("CASSANDRA_TIMEOUT", "5")),
-			NumConns:       getNumConns(getEnv("CASSANDRA_NUM_CONNS", "10")),
-			ConnectTimeout: getTimeout(getEnv("CASSANDRA_CONNECT_TIMEOUT", "5")),
-			QueryTimeout:   getTimeout(getEnv("CASSANDRA_QUERY_TIMEOUT", "5")),
+			Host:            getEnv("CASSANDRA_HOST", "localhost"),
+			Ports:           cassandraPorts,
+			Port:            cassandraPort,
+			User:            getEnv("CASSANDRA_USER", "cassandra_user"),
+			Password:        getEnv("CASSANDRA_PASSWORD", "cassandra_password"),
+			Keyspace:        getEnv("CASSANDRA_KEYSPACE", "logs"),
+			Consistency:     getEnv("CASSANDRA_CONSISTENCY", "quorum"),
+			Timeout:         getTimeout(getEnv("CASSANDRA_TIMEOUT", "5")),
+			NumConns:        getNumConns(getEnv("CASSANDRA_NUM_CONNS", "10")),
+			ConnectTimeout:  getTimeout(getEnv("CASSANDRA_CONNECT_TIMEOUT", "5")),
+			QueryTimeout:    getTimeout(getEnv("CASSANDRA_QUERY_TIMEOUT", "5")),
+			ConsumerGroupId: getEnv("CASSANDRA_CONSUMER_GROUPID", "cassandra-consumer"),
 		},
 		ClickHouseConfig: ClickHouseConfig{
-			Host:     getEnv("CLICKHOUSE_HOST", "localhost"),
-			Port:     clickhousePort,
-			Username: getEnv("CLICKHOUSE_USERNAME", "clickhouse_user"),
-			Password: getEnv("CLICKHOUSE_PASSWORD", "clickhouse_password"),
-			Database: getEnv("CLICKHOUSE_DATABASE", "logs"),
+			Host:            getEnv("CLICKHOUSE_HOST", "localhost"),
+			Port:            clickhousePort,
+			Username:        getEnv("CLICKHOUSE_USERNAME", "clickhouse_user"),
+			Password:        getEnv("CLICKHOUSE_PASSWORD", "clickhouse_password"),
+			Database:        getEnv("CLICKHOUSE_DATABASE", "logs"),
+			ConsumerGroupId: getEnv("CLICKHOUSE_CONSUMER_GROUPID", "clickhouse-consumer"),
 		},
 	}
 	return cfg

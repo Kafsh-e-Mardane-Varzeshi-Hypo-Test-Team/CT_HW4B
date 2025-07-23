@@ -57,7 +57,7 @@ func (h *Handler) SubmitLogHandler(c *gin.Context) {
 		return
 	}
 
-	err = h.kafkaProducer.ProduceMessage(message)
+	err = h.kafkaProducer.ProduceMessage(c, message)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send log to Kafka"})
 		log.Printf("[api.SubmitLogHandler] Failed to produce message to Kafka: %v", err)

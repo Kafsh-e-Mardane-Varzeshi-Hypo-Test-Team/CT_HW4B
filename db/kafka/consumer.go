@@ -13,19 +13,25 @@ import (
 type Consumer struct {
 	reader *kafka.Reader
 	insert func(event models.LogRequest) error
+	topic  string
 }
 
-func NewConsumer(cfg config.KafkaConfig, insert func(event models.LogRequest) error) *Consumer {
+func NewConsumer(cfg config.KafkaConfig, insert func(event models.LogRequest) error, groupId string) *Consumer {
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:   []string{cfg.Broker},
-		Topic:     cfg.Topic,
-		Partition: 0,
-		MinBytes:  1,    // 1 byte
-		MaxBytes:  10e6, // 10MB
+		Brokers:     cfg.Brokers,
+		Topic:       cfg.Topic,
+		GroupID:     groupId,
+		StartOffset: kafka.FirstOffset,
+		MinBytes:    1,    // 1 byte
+		MaxBytes:    10e6, // 10MB
 	})
 
-	log.Printf("[kafka.NewConsumer] Successfully connected to Kafka! Broker: %s, Topic: %s", cfg.Broker, cfg.Topic)
-	return &Consumer{reader: reader, insert: insert}
+	log.Printf("[kafka.NewConsumer] Created Kafka consumer for topic=%q, groupID=%q, brokers=%v", cfg.Topic, groupId, cfg.Brokers)
+	return &Consumer{
+		reader: reader,
+		insert: insert,
+		topic:  cfg.Topic,
+	}
 }
 
 func (c *Consumer) ConsumeMessages() {
@@ -48,4 +54,9 @@ func (c *Consumer) ConsumeMessages() {
 			log.Printf("[kafka.ConsumeMessages] Successfully inserted event: %s", event.Payload.Name)
 		}
 	}
+}
+
+func (c *Consumer) Close() error {
+	log.Printf("[kafka.Consumer] Closing consumer for topic=%q", c.topic)
+	return c.reader.Close()
 }

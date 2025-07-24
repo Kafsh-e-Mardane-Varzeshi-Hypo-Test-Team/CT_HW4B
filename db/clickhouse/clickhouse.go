@@ -40,6 +40,12 @@ func NewClickHouseClient(cfg config.ClickHouseConfig) (*ClickHouseClient, error)
 }
 
 func (c *ClickHouseClient) Insert(event models.LogRequest) error {
+	// Extract keys from the data map
+	keys := make([]string, 0, len(event.Payload.Data))
+	for key := range event.Payload.Data {
+		keys = append(keys, key)
+	}
+
 	query := `
 	INSERT INTO logs.events (
 		event_id,
@@ -54,7 +60,7 @@ func (c *ClickHouseClient) Insert(event models.LogRequest) error {
 		event.ProjectID,
 		event.Payload.Name,
 		event.Payload.Timestamp,
-		event.Payload.Keys,
+		keys,
 	)
 	if err != nil {
 		return fmt.Errorf("[clickhouse.Insert] Failed to insert event: %v", err)
@@ -151,7 +157,8 @@ func (c *ClickHouseClient) GetEventDetails(projectID, eventName string, filterKe
 	for rows.Next() {
 		var event models.Event
 		var eventIDStr string
-		err := rows.Scan(&eventIDStr, &event.ProjectID, &event.Name, &event.Timestamp, &event.Keys)
+		var keys []string
+		err := rows.Scan(&eventIDStr, &event.ProjectID, &event.Name, &event.Timestamp, &keys)
 		if err != nil {
 			return nil, fmt.Errorf("[clickhouse.GetEventDetails] Failed to scan row: %v", err)
 		}
@@ -161,7 +168,15 @@ func (c *ClickHouseClient) GetEventDetails(projectID, eventName string, filterKe
 		if err != nil {
 			return nil, fmt.Errorf("[clickhouse.GetEventDetails] Failed to parse UUID: %v", err)
 		}
+
+		// Create a minimal data map from keys (since ClickHouse doesn't store full data)
+		data := make(map[string]string)
+		for _, key := range keys {
+			data[key] = "" // Empty value since we don't have the actual data
+		}
+
 		event.EventID = eventID
+		event.Data = data
 		event.CreatedAt = event.Timestamp // Using timestamp as created_at for now
 		events = append(events, event)
 	}

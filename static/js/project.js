@@ -157,7 +157,7 @@ function displayEvents() {
                     <p>Start sending events to this project to see them here.</p>
                     <div style="margin-top: 1rem; font-size: 0.875rem; color: #64748b;">
                         <p>Use the API key above to submit events:</p>
-                        <pre style="background: #f1f5f9; padding: 1rem; border-radius: 0.5rem; overflow-x: auto;">
+                        <pre style="text-align:left; background: #f1f5f9; padding: 1rem; border-radius: 0.5rem; overflow-x: auto;">
 curl -X POST http://localhost:9090/api/logs \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -166,7 +166,10 @@ curl -X POST http://localhost:9090/api/logs \\
     "payload": {
       "name": "test_event",
       "timestamp": "${new Date().toISOString()}",
-      "keys": ["user_id", "session_id"]
+      "data": {
+        "user_id": "12345",
+        "session_id": "67890"
+      }
     }
   }'</pre>
                     </div>
@@ -287,6 +290,32 @@ function displayEventDetails(events, eventName) {
     document.getElementById('eventModalTitle').textContent = `Event: ${eventName}`;
     document.getElementById('eventCounter').textContent = `${currentEventIndex + 1} of ${events.length}`;
     
+    // Build data display HTML
+    let dataHtml = '';
+    if (event.data && Object.keys(event.data).length > 0) {
+        dataHtml = `
+            <div class="event-detail-item">
+                <label>Event Data:</label>
+                <div class="event-data">
+                    ${Object.entries(event.data).map(([key, value]) => {
+                        let valueStr = '';
+                        if (value === null || value === undefined || value === '') {
+                            valueStr = '<em>empty</em>';
+                        } else if (value.length > 100) {
+                            valueStr = `<pre>${value}</pre>`;
+                        } else {
+                            valueStr = value;
+                        }
+                        return `<div class="data-item">
+                            <span class="data-key">${key}</span>
+                            <span class="data-value">${valueStr}</span>
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
     const detailsHtml = `
         <div class="event-detail-item">
             <label>Event Name:</label>
@@ -300,14 +329,7 @@ function displayEventDetails(events, eventName) {
             <label>Created:</label>
             <span>${formatDateTime(event.created_at)}</span>
         </div>
-        <div class="event-detail-item">
-            <label>Keys:</label>
-            <div class="event-keys">
-                ${event.keys.map((key, index) => 
-                    `<span class="event-key">Key ${index + 1}: ${key}</span>`
-                ).join('')}
-            </div>
-        </div>
+        ${dataHtml}
     `;
     
     document.getElementById('eventDetails').innerHTML = detailsHtml;

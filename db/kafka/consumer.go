@@ -34,10 +34,14 @@ func NewConsumer(cfg config.KafkaConfig, insert func(event models.LogRequest) er
 	}
 }
 
-func (c *Consumer) ConsumeMessages() {
+func (c *Consumer) ConsumeMessages(ctx context.Context) error {
 	for {
-		m, err := c.reader.ReadMessage(context.Background())
+		m, err := c.reader.ReadMessage(ctx)
 		if err != nil {
+			if ctx.Err() != nil {
+				log.Println("[kafka.ConsumeMessages] Stopping consumer due to context cancellation")
+				return nil
+			}
 			log.Printf("[kafka.ConsumeMessages] Failed to read message: %v", err)
 			continue
 		}

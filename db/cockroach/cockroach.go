@@ -335,24 +335,6 @@ func (c *CockroachClient) GetClusterStatus() (map[string]interface{}, error) {
 	}, nil
 }
 
-// RetryWithBackoff executes a function with exponential backoff retry logic
-func (c *CockroachClient) RetryWithBackoff(operation func() error, maxRetries int) error {
-	var lastErr error
-	for i := 0; i < maxRetries; i++ {
-		err := operation()
-		if err == nil {
-			return nil
-		}
-		lastErr = err
-
-		// Exponential backoff: 1s, 2s, 4s, 8s, etc.
-		backoff := time.Duration(1<<uint(i)) * time.Second
-		log.Printf("Operation failed, retrying in %v: %v", backoff, err)
-		time.Sleep(backoff)
-	}
-	return fmt.Errorf("operation failed after %d retries: %v", maxRetries, lastErr)
-}
-
 // Close closes the database connection
 func (c *CockroachClient) Close() error {
 	if c.Db != nil {

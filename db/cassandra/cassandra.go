@@ -80,18 +80,21 @@ func getConsistencyLevel(consistency string) gocql.Consistency {
 }
 
 func (c *CassandraClient) Insert(event models.LogRequest) error {
+	// Data is already map[string]string, no conversion needed
+	dataMap := event.Payload.Data
+
 	query := `INSERT INTO logs.events (
 		event_id,
 		project_id,
 		name,
 		time,
-		keys
+		data
 	) VALUES (?, ?, ?, ?, ?)`
 
 	// Use prepared statement for better performance
 	stmt := c.Session.Query(query, event.EventID,
 		event.ProjectID, event.Payload.Name, event.Payload.Timestamp,
-		event.Payload.Keys)
+		dataMap)
 
 	// Set consistency level for write operations
 	stmt.SetConsistency(gocql.Quorum)
@@ -120,7 +123,7 @@ func (c *CassandraClient) GetEventDetails(projectID, eventName string, filterKey
 			project_id,
 			name,
 			time,
-			keys
+			data
 		FROM logs.events 
 		WHERE project_id = ?`
 
@@ -152,13 +155,19 @@ func (c *CassandraClient) GetEventDetails(projectID, eventName string, filterKey
 	var projID gocql.UUID
 	var name string
 	var timestamp time.Time
-	var keys []string
+	var dataMap map[string]string
 
 	// Collect all matching events
-	for iter.Scan(&eventID, &projID, &name, &timestamp, &keys) {
+	for iter.Scan(&eventID, &projID, &name, &timestamp, &dataMap) {
 		// Apply name filter in application if not already filtered in query
 		if eventName != "" && name != eventName {
 			continue
+		}
+
+		// Extract keys from data map for filtering
+		keys := make([]string, 0, len(dataMap))
+		for key := range dataMap {
+			keys = append(keys, key)
 		}
 
 		// Apply key filters in application (more efficient than ALLOW FILTERING)
@@ -188,7 +197,7 @@ func (c *CassandraClient) GetEventDetails(projectID, eventName string, filterKey
 			ProjectID: projID.String(),
 			Name:      name,
 			Timestamp: timestamp,
-			Keys:      keys,
+			Data:      dataMap,
 			CreatedAt: timestamp,
 		}
 		events = append(events, event)
@@ -239,13 +248,16 @@ func (c *CassandraClient) BatchInsert(events []models.LogRequest) error {
 		project_id,
 		name,
 		time,
-		keys
+		data
 	) VALUES (?, ?, ?, ?, ?)`
 
 	for _, event := range events {
+		// Data is already map[string]string, no conversion needed
+		dataMap := event.Payload.Data
+
 		batch.Query(query, event.EventID,
 			event.ProjectID, event.Payload.Name, event.Payload.Timestamp,
-			event.Payload.Keys)
+			dataMap)
 	}
 
 	// Set consistency level for batch operations

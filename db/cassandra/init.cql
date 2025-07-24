@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS logs.events (
     name TEXT,
     time TIMESTAMP,
     created_at TIMESTAMP,
-    keys LIST<TEXT>, 
+    data MAP<TEXT, TEXT>,
     PRIMARY KEY ((project_id), time, event_id)
 ) WITH CLUSTERING ORDER BY (time DESC);
    

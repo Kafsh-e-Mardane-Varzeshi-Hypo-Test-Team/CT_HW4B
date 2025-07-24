@@ -23,7 +23,6 @@ type KafkaConfig struct {
 type CassandraConfig struct {
 	Host            string
 	Ports           []int
-	Port            int // Keep for backward compatibility
 	User            string
 	Password        string
 	Keyspace        string
@@ -60,11 +59,6 @@ func getEnv(key, defaultValue string) string {
 }
 
 func Load() *Config {
-	cassandraPort, err := strconv.Atoi(getEnv("CASSANDRA_PORT", "9042"))
-	if err != nil {
-		log.Fatalf("[config.Load] Invalid CASSANDRA_PORT: %v", err)
-	}
-
 	clickhousePort, err := strconv.Atoi(getEnv("CLICKHOUSE_PORT", "9000"))
 	if err != nil {
 		log.Fatalf("[config.Load] Invalid CLICKHOUSE_PORT: %v", err)
@@ -122,7 +116,6 @@ func Load() *Config {
 		CassandraConfig: CassandraConfig{
 			Host:            getEnv("CASSANDRA_HOST", "localhost"),
 			Ports:           cassandraPorts,
-			Port:            cassandraPort,
 			User:            getEnv("CASSANDRA_USER", "cassandra_user"),
 			Password:        getEnv("CASSANDRA_PASSWORD", "cassandra_password"),
 			Keyspace:        getEnv("CASSANDRA_KEYSPACE", "logs"),

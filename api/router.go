@@ -51,5 +51,9 @@ func SetupRouter(h *Handler) *gin.Engine {
 		c.JSON(http.StatusOK, status)
 	})
 
+	// ClickHouse TTL management endpoints
+	r.POST("/api/clickhouse/optimize", h.OptimizeClickHouseTableHandler)
+	r.GET("/api/clickhouse/ttl-status", h.GetClickHouseTTLStatusHandler)
+
 	return r
 }

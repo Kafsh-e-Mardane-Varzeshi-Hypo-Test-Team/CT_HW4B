@@ -417,3 +417,34 @@ func (h *Handler) ValidateSessionHandler(c *gin.Context) {
 	})
 	log.Printf("[api.ValidateSessionHandler] Session validated for user: %s", user.Username)
 }
+
+// OptimizeClickHouseTableHandler triggers TTL deletion and table optimization
+func (h *Handler) OptimizeClickHouseTableHandler(c *gin.Context) {
+	err := h.clickhouseClient.OptimizeTable()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to optimize ClickHouse table"})
+		log.Printf("[api.OptimizeClickHouseTableHandler] Failed to optimize table: %v", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "ClickHouse table optimization completed successfully",
+	})
+	log.Printf("[api.OptimizeClickHouseTableHandler] ClickHouse table optimization completed")
+}
+
+// GetClickHouseTTLStatusHandler returns TTL processing status
+func (h *Handler) GetClickHouseTTLStatusHandler(c *gin.Context) {
+	status, err := h.clickhouseClient.GetTTLStatus()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get TTL status"})
+		log.Printf("[api.GetClickHouseTTLStatusHandler] Failed to get TTL status: %v", err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"ttl_status": status,
+		"count":      len(status),
+	})
+	log.Printf("[api.GetClickHouseTTLStatusHandler] Retrieved TTL status for %d partitions", len(status))
+}

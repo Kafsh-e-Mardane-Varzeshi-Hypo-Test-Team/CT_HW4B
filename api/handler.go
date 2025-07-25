@@ -49,6 +49,16 @@ func (h *Handler) SubmitLogHandler(c *gin.Context) {
 		return
 	}
 
+	projectTTL, err := h.cockroachClient.GetProjectTTL(req.ProjectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve project TTL"})
+		log.Printf("[api.SubmitLogHandler] Failed to get project TTL: %v", err)
+		return
+	}
+	if projectTTL != nil {
+		req.Payload.TTL = projectTTL
+	}
+
 	req.EventID = gocql.TimeUUID()
 	message, err := json.Marshal(req)
 	if err != nil {

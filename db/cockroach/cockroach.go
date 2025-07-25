@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -333,6 +334,37 @@ func (c *CockroachClient) GetClusterStatus() (map[string]interface{}, error) {
 		"replication_factor": replicationFactor,
 		"total_nodes":        len(nodes),
 	}, nil
+}
+
+// GetProjectTTL retrieves the TTL for a specific project
+func (c *CockroachClient) GetProjectTTL(projectID string) (*int64, error) {
+	var ttlString *string
+
+	err := c.Db.QueryRow(
+		`
+		SELECT EXTRACT(epoch FROM ttl)::INT AS ttl_seconds
+		FROM projects
+		WHERE id = $1
+		`,
+		projectID,
+	).Scan(&ttlString)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project TTL: %v", err)
+	}
+
+	// If no TTL is set, return nil
+	if ttlString == nil {
+		return nil, nil
+	}
+
+	duration, err := strconv.ParseInt(*ttlString, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse project TTL duration '%s': %v", *ttlString, err)
+	}
+
+	ttlSeconds := int64(duration)
+	return &ttlSeconds, nil
 }
 
 // Close closes the database connection

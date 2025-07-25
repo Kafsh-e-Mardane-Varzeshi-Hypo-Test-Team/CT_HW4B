@@ -1,187 +1,193 @@
+version: '3.8'
+
 x-kafka-common: &kafka-common
   image: bitnami/kafka:latest
   networks:
     - kafka-network
-  environment: &kafka-env
-    KAFKA_ENABLE_KRAFT: "yes"
-    KAFKA_CFG_PROCESS_ROLES: controller,broker
-    KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka1:9093,2@kafka2:9093,3@kafka3:9093
-    KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-    KAFKA_CFG_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
-    KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
-    KAFKA_CFG_INTER_BROKER_LISTENER_NAME: INTERNAL
-    KAFKA_KRAFT_CLUSTER_ID: kraft-cluster
-    KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: "3"
-  deploy:
-    resources:
-      limits:
-        cpus: "0.5"
-        memory: 768M
-  restart: unless-stopped
+  mem_limit: 768m
+  cpus: 0.5
 
 x-cockroach-common: &cockroach-common
   image: cockroachdb/cockroach:latest
-  command: start --insecure --join=cockroachdb-1,cockroachdb-2,cockroachdb-3
+  mem_limit: 768m
+  cpus: 0.5
   networks:
     - cockroach-network
-  deploy:
-    resources:
-      limits:
-        cpus: "0.5"
-        memory: 768M
-  restart: unless-stopped
-  healthcheck:
-    test: ["CMD", "cockroach", "node", "status", "--insecure", "--host=localhost"]
-    interval: 10s
-    timeout: 5s
-    retries: 5
 
 x-cassandra-common: &cassandra-common
   image: cassandra:latest
-  environment: &cassandra-env
-    CASSANDRA_CLUSTER_NAME: my_cluster
-    CASSANDRA_DC: datacenter1
-    CASSANDRA_RACK: rack1
-    CASSANDRA_SEEDS: cassandra-1,cassandra-2,cassandra-3
-    CASSANDRA_USER: cassandra_user
-    CASSANDRA_PASSWORD: cassandra_password
-    MAX_HEAP_SIZE: 768M
-    HEAP_NEWSIZE: 128M
   mem_reservation: 1g
   mem_limit: 2g
   networks:
     - cassandra-network
-  healthcheck:
-    test: ["CMD-SHELL", "cqlsh -e 'describe cluster' || exit 1"]
-    interval: 15s
-    timeout: 10s
-    retries: 10
-    start_period: 30s
 
 services:
-  kafka1:
+  kafka-1:
     <<: *kafka-common
-    container_name: kafka1
+    container_name: kafka-1
     ports:
       - "9092:9092"
+    volumes:
+      - kafka-data-1:/bitnami/kafka
     environment:
-      <<: *kafka-env
-      KAFKA_CFG_NODE_ID: "1"
-      KAFKA_CFG_ADVERTISED_LISTENERS: INTERNAL://kafka1:29092,EXTERNAL://localhost:9092
+      - KAFKA_ENABLE_KRAFT=yes
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENERS=INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - KAFKA_KRAFT_CLUSTER_ID=kraft-cluster
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka-1:29092,EXTERNAL://localhost:9092
 
-  kafka2:
+  kafka-2:
     <<: *kafka-common
-    container_name: kafka2
+    container_name: kafka-2
     ports:
       - "9093:9092"
+    volumes:
+      - kafka-data-2:/bitnami/kafka
     environment:
-      <<: *kafka-env
-      KAFKA_CFG_NODE_ID: "2"
-      KAFKA_CFG_ADVERTISED_LISTENERS: INTERNAL://kafka2:29092,EXTERNAL://localhost:9093
+      - KAFKA_ENABLE_KRAFT=yes
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENERS=INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - KAFKA_KRAFT_CLUSTER_ID=kraft-cluster
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      - KAFKA_CFG_NODE_ID=2
+      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka-2:29092,EXTERNAL://localhost:9093
 
-  kafka3:
+  kafka-3:
     <<: *kafka-common
-    container_name: kafka3
+    container_name: kafka-3
     ports:
       - "9094:9092"
+    volumes:
+      - kafka-data-3:/bitnami/kafka
     environment:
-      <<: *kafka-env
-      KAFKA_CFG_NODE_ID: "3"
-      KAFKA_CFG_ADVERTISED_LISTENERS: INTERNAL://kafka3:29092,EXTERNAL://localhost:9094
+      - KAFKA_ENABLE_KRAFT=yes
+      - KAFKA_CFG_PROCESS_ROLES=controller,broker
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka-1:9093,2@kafka-2:9093,3@kafka-3:9093
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_LISTENERS=INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - KAFKA_KRAFT_CLUSTER_ID=kraft-cluster
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      - KAFKA_CFG_NODE_ID=3
+      - KAFKA_CFG_ADVERTISED_LISTENERS=INTERNAL://kafka-3:29092,EXTERNAL://localhost:9094
 
-
-  cockroachdb-1:
+  cockroach-1:
     <<: *cockroach-common
-    container_name: cockroachdb-1
-    command: start --insecure --advertise-addr=cockroachdb-1 --join=cockroachdb-1,cockroachdb-2,cockroachdb-3
+    container_name: cockroach-1
+    command: start --insecure --advertise-addr=cockroach-1 --join=cockroach-1,cockroach-2,cockroach-3
     ports:
       - "26257:26257"
       - "8080:8080"
     volumes:
       - cockroach-data-1:/cockroach/cockroach-data
 
-  cockroachdb-2:
+  cockroach-2:
     <<: *cockroach-common
-    container_name: cockroachdb-2
-    command: start --insecure --advertise-addr=cockroachdb-2 --join=cockroachdb-1,cockroachdb-2,cockroachdb-3
+    container_name: cockroach-2
+    command: start --insecure --advertise-addr=cockroach-2 --join=cockroach-1,cockroach-2,cockroach-3
     ports:
       - "26258:26257"
       - "8081:8080"
     volumes:
       - cockroach-data-2:/cockroach/cockroach-data
 
-  cockroachdb-3:
+  cockroach-3:
     <<: *cockroach-common
-    container_name: cockroachdb-3
-    command: start --insecure --advertise-addr=cockroachdb-3 --join=cockroachdb-1,cockroachdb-2,cockroachdb-3
+    container_name: cockroach-3
+    command: start --insecure --advertise-addr=cockroach-3 --join=cockroach-1,cockroach-2,cockroach-3
     ports:
       - "26259:26257"
       - "8082:8080"
     volumes:
       - cockroach-data-3:/cockroach/cockroach-data
 
-
-  cockroachdb-init:
-    image: cockroachdb/cockroach:latest
-    container_name: cockroachdb-init
-    command: init --insecure --host=cockroachdb-1
+  cockroach-init:
+    <<: *cockroach-common
+    container_name: cockroach-init
+    command: init --insecure --host=cockroach-1
     depends_on:
-      - cockroachdb-1
-      - cockroachdb-2
-      - cockroachdb-3
-    networks:
-      - cockroach-network
+      - cockroach-1
+      - cockroach-2
+      - cockroach-3
     restart: "no"
     
   cassandra-1:
     <<: *cassandra-common
     container_name: cassandra-1
-    hostname: cassandra-1
-    environment:
-      <<: *cassandra-env
-      CASSANDRA_LISTEN_ADDRESS: cassandra-1
-      CASSANDRA_BROADCAST_ADDRESS: cassandra-1
-      CASSANDRA_RPC_ADDRESS: cassandra-1
-      CASSANDRA_BROADCAST_RPC_ADDRESS: cassandra-1
     ports:
       - "9042:9042"
     volumes:
-      - cassandra-1-data:/var/lib/cassandra
+      - cassandra-data-1:/var/lib/cassandra
+    environment:
+      - CASSANDRA_CLUSTER_NAME=my_cluster
+      - CASSANDRA_DC=datacenter1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_SEEDS=cassandra-1,cassandra-2,cassandra-3
+      - CASSANDRA_USER=cassandra
+      - CASSANDRA_PASSWORD=cassandra
+      - MAX_HEAP_SIZE=768M
+      - HEAP_NEWSIZE=128M
+      - CASSANDRA_LISTEN_ADDRESS=cassandra-1
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra-1
+      - CASSANDRA_RPC_ADDRESS=cassandra-1
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra-1
 
   cassandra-2:
     <<: *cassandra-common
     container_name: cassandra-2
-    hostname: cassandra-2
-    environment:
-      <<: *cassandra-env
-      CASSANDRA_LISTEN_ADDRESS: cassandra-2
-      CASSANDRA_BROADCAST_ADDRESS: cassandra-2
-      CASSANDRA_RPC_ADDRESS: cassandra-2
-      CASSANDRA_BROADCAST_RPC_ADDRESS: cassandra-2
     ports:
       - "9043:9042"
     volumes:
-      - cassandra-2-data:/var/lib/cassandra
+      - cassandra-data-2:/var/lib/cassandra
+    environment:
+      - CASSANDRA_CLUSTER_NAME=my_cluster
+      - CASSANDRA_DC=datacenter1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_SEEDS=cassandra-1,cassandra-2,cassandra-3
+      - CASSANDRA_USER=cassandra
+      - CASSANDRA_PASSWORD=cassandra
+      - MAX_HEAP_SIZE=768M
+      - HEAP_NEWSIZE=128M
+      - CASSANDRA_LISTEN_ADDRESS=cassandra-2
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra-2
+      - CASSANDRA_RPC_ADDRESS=cassandra-2
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra-2
 
   cassandra-3:
     <<: *cassandra-common
     container_name: cassandra-3
-    hostname: cassandra-3
-    environment:
-      <<: *cassandra-env
-      CASSANDRA_LISTEN_ADDRESS: cassandra-3
-      CASSANDRA_BROADCAST_ADDRESS: cassandra-3
-      CASSANDRA_RPC_ADDRESS: cassandra-3
-      CASSANDRA_BROADCAST_RPC_ADDRESS: cassandra-3
     ports:
       - "9044:9042"
     volumes:
-      - cassandra-3-data:/var/lib/cassandra
+      - cassandra-data-3:/var/lib/cassandra
+    environment:
+      - CASSANDRA_CLUSTER_NAME=my_cluster
+      - CASSANDRA_DC=datacenter1
+      - CASSANDRA_RACK=rack1
+      - CASSANDRA_SEEDS=cassandra-1,cassandra-2,cassandra-3
+      - CASSANDRA_USER=cassandra
+      - CASSANDRA_PASSWORD=cassandra
+      - MAX_HEAP_SIZE=768M
+      - HEAP_NEWSIZE=128M
+      - CASSANDRA_LISTEN_ADDRESS=cassandra-3
+      - CASSANDRA_BROADCAST_ADDRESS=cassandra-3
+      - CASSANDRA_RPC_ADDRESS=cassandra-3
+      - CASSANDRA_BROADCAST_RPC_ADDRESS=cassandra-3
 
-
-  cassandra-load-keyspace:
+  cassandra-init:
     image: cassandra:latest
-    container_name: cassandra-load-keyspace
+    container_name: cassandra-init
     depends_on:
       - cassandra-1
       - cassandra-2
@@ -202,14 +208,15 @@ services:
     networks:
       - cassandra-network
 
-  clickhouse:
+  clickhouse-server:
     image: clickhouse/clickhouse-server:latest
-    container_name: clickhouse 
+    container_name: clickhouse-server
     ports:
       - "8123:8123"
       - "9000:9000"
     volumes:
       - ./db/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - clickhouse-data:/var/lib/clickhouse
     environment:
       - CLICKHOUSE_DB=logs
       - CLICKHOUSE_USER=clickhouse_user
@@ -227,9 +234,17 @@ networks:
     driver: bridge
 
 volumes:
+  kafka-data-1:
+  kafka-data-2:
+  kafka-data-3:
+  
   cockroach-data-1:
   cockroach-data-2:
   cockroach-data-3:
-  cassandra-1-data:
-  cassandra-2-data:
-  cassandra-3-data:
+  
+  cassandra-data-1:
+  cassandra-data-2:
+  cassandra-data-3:
+  
+  clickhouse-data:
+  

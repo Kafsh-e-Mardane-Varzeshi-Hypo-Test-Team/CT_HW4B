@@ -116,8 +116,8 @@ func Load() *Config {
 		CassandraConfig: CassandraConfig{
 			Host:            getEnv("CASSANDRA_HOST", "localhost"),
 			Ports:           cassandraPorts,
-			User:            getEnv("CASSANDRA_USER", "cassandra_user"),
-			Password:        getEnv("CASSANDRA_PASSWORD", "cassandra_password"),
+			User:            getEnv("CASSANDRA_USER", "cassandra"),
+			Password:        getEnv("CASSANDRA_PASSWORD", "cassandra"),
 			Keyspace:        getEnv("CASSANDRA_KEYSPACE", "logs"),
 			Consistency:     getEnv("CASSANDRA_CONSISTENCY", "quorum"),
 			Timeout:         getTimeout(getEnv("CASSANDRA_TIMEOUT", "5")),

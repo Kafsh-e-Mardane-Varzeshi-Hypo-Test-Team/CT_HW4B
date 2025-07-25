@@ -83,29 +83,57 @@ func (c *CassandraClient) Insert(event models.LogRequest) error {
 	// Data is already map[string]string, no conversion needed
 	dataMap := event.Payload.Data
 
-	query := `INSERT INTO logs.events (
-		event_id,
-		project_id,
-		name,
-		time,
-		data
-	) VALUES (?, ?, ?, ?, ?)`
+	// Build query with optional TTL
+	var query string
+	if event.Payload.TTL != nil && *event.Payload.TTL > 0 {
+		query = `INSERT INTO logs.events (
+			event_id,
+			project_id,
+			name,
+			time,
+			data
+		) VALUES (?, ?, ?, ?, ?) USING TTL ?`
 
-	// Use prepared statement for better performance
-	stmt := c.Session.Query(query, event.EventID,
-		event.ProjectID, event.Payload.Name, event.Payload.Timestamp,
-		dataMap)
+		// Use prepared statement for better performance
+		stmt := c.Session.Query(query, event.EventID,
+			event.ProjectID, event.Payload.Name, event.Payload.Timestamp,
+			dataMap, int(*event.Payload.TTL))
 
-	// Set consistency level for write operations
-	stmt.SetConsistency(gocql.Quorum)
+		// Set consistency level for write operations
+		stmt.SetConsistency(gocql.Quorum)
 
-	err := stmt.Exec()
-	if err != nil {
-		return fmt.Errorf("[cassandra.Insert] Failed to insert event: %v", err)
+		err := stmt.Exec()
+		if err != nil {
+			return fmt.Errorf("[cassandra.Insert] Failed to insert event: %v", err)
+		}
+
+		log.Printf("[cassandra.Insert] Successfully inserted event with TTL of %d seconds: %s", *event.Payload.TTL, event.Payload.Name)
+		return nil
+	} else {
+		query = `INSERT INTO logs.events (
+			event_id,
+			project_id,
+			name,
+			time,
+			data
+		) VALUES (?, ?, ?, ?, ?)`
+
+		// Use prepared statement for better performance
+		stmt := c.Session.Query(query, event.EventID,
+			event.ProjectID, event.Payload.Name, event.Payload.Timestamp,
+			dataMap)
+
+		// Set consistency level for write operations
+		stmt.SetConsistency(gocql.Quorum)
+
+		err := stmt.Exec()
+		if err != nil {
+			return fmt.Errorf("[cassandra.Insert] Failed to insert event: %v", err)
+		}
+
+		log.Printf("[cassandra.Insert] Successfully inserted event: %s", event.Payload.Name)
+		return nil
 	}
-
-	log.Printf("[cassandra.Insert] Successfully inserted event: %+v", event)
-	return nil
 }
 
 // GetEventDetails retrieves detailed event data for a specific event name using Cassandra
@@ -243,7 +271,8 @@ func (c *CassandraClient) BatchInsert(events []models.LogRequest) error {
 	// Create batch for better performance
 	batch := c.Session.NewBatch(gocql.LoggedBatch)
 
-	query := `INSERT INTO logs.events (
+	// Separate queries for events with and without TTL
+	queryWithoutTTL := `INSERT INTO logs.events (
 		event_id,
 		project_id,
 		name,
@@ -251,13 +280,32 @@ func (c *CassandraClient) BatchInsert(events []models.LogRequest) error {
 		data
 	) VALUES (?, ?, ?, ?, ?)`
 
+	queryWithTTL := `INSERT INTO logs.events (
+		event_id,
+		project_id,
+		name,
+		time,
+		data
+	) VALUES (?, ?, ?, ?, ?) USING TTL ?`
+
+	ttlCount := 0
+	noTtlCount := 0
+
 	for _, event := range events {
 		// Data is already map[string]string, no conversion needed
 		dataMap := event.Payload.Data
 
-		batch.Query(query, event.EventID,
-			event.ProjectID, event.Payload.Name, event.Payload.Timestamp,
-			dataMap)
+		if event.Payload.TTL != nil && *event.Payload.TTL > 0 {
+			batch.Query(queryWithTTL, event.EventID,
+				event.ProjectID, event.Payload.Name, event.Payload.Timestamp,
+				dataMap, int(*event.Payload.TTL))
+			ttlCount++
+		} else {
+			batch.Query(queryWithoutTTL, event.EventID,
+				event.ProjectID, event.Payload.Name, event.Payload.Timestamp,
+				dataMap)
+			noTtlCount++
+		}
 	}
 
 	// Set consistency level for batch operations
@@ -268,6 +316,6 @@ func (c *CassandraClient) BatchInsert(events []models.LogRequest) error {
 		return fmt.Errorf("[cassandra.BatchInsert] Failed to insert batch of %d events: %v", len(events), err)
 	}
 
-	log.Printf("[cassandra.BatchInsert] Successfully inserted batch of %d events", len(events))
+	log.Printf("[cassandra.BatchInsert] Successfully inserted batch of %d events (%d with TTL, %d without TTL)", len(events), ttlCount, noTtlCount)
 	return nil
 }

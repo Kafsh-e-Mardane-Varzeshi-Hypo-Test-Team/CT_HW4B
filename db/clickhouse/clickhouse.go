@@ -118,6 +118,33 @@ func (c *ClickHouseClient) GetEventSummaries(projectID string, filterKeys []stri
 	return summaries, nil
 }
 
+func (c *ClickHouseClient) GetEventCount(projectID, eventName string, filterKeys []string) (int, error) {
+	var args []interface{}
+	query := `
+		SELECT 
+			count()
+		FROM logs.events 
+		WHERE project_id = ? AND name = ?`
+	args = append(args, projectID, eventName)
+
+	if len(filterKeys) > 0 {
+		keyConditions := make([]string, len(filterKeys))
+		for i, key := range filterKeys {
+			keyConditions[i] = "arrayExists(x -> x = ?, keys)"
+			args = append(args, key)
+		}
+		query += " AND " + strings.Join(keyConditions, " AND ")
+	}
+
+	var count int
+	err := c.DB.QueryRowContext(context.Background(), query, args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("[clickhouse.GetEventCount] Failed to query count: %v", err)
+	}
+
+	return count, nil
+}
+
 // GetEventDetails retrieves detailed event data for a specific event name using ClickHouse
 func (c *ClickHouseClient) GetEventDetails(projectID, eventName string, filterKeys []string, offset, limit int) ([]models.Event, error) {
 	var args []interface{}

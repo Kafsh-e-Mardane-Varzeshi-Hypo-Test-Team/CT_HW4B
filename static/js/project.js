@@ -10,6 +10,8 @@ let currentEventName = '';
 let currentEventOffset = 0;
 let currentEventLimit = 10;
 let hasMoreEvents = false;
+let currentEventTotal = 0;
+let isLoadingMoreEvents = false;
 
 // Check authentication and load project data
 document.addEventListener('DOMContentLoaded', function() {
@@ -238,14 +240,15 @@ function clearFilters() {
 // Open event details modal
 async function openEventDetails(eventName) {
     console.log('Opening event details for:', eventName);
-    
+
     try {
-        // Reset pagination state
         currentEventIndex = 0;
         currentEventOffset = 0;
         currentEventName = eventName;
         hasMoreEvents = false;
-        
+        currentEventDetails = [];
+        currentEventTotal = 0;
+
         const params = new URLSearchParams();
         params.append('name', eventName);
         params.append('limit', currentEventLimit.toString());
@@ -253,17 +256,19 @@ async function openEventDetails(eventName) {
         if (selectedKeys.length > 0) {
             params.append('keys', selectedKeys.join(','));
         }
-        
+
         const response = await fetch(`/api/projects/${currentProject.id}/events/details?${params}`, {
             headers: {
                 'X-User-ID': currentUser.id
             }
         });
-        
+
         if (response.ok) {
             const result = await response.json();
             currentEventDetails = result.events || [];
+            currentEventTotal = result.total || 0;
             hasMoreEvents = currentEventDetails.length === currentEventLimit;
+
             displayEventDetails(currentEventDetails, eventName);
             document.getElementById('eventModal').style.display = 'block';
         } else {
@@ -288,8 +293,8 @@ function displayEventDetails(events, eventName) {
     
     const event = events[currentEventIndex];
     document.getElementById('eventModalTitle').textContent = `Event: ${eventName}`;
-    document.getElementById('eventCounter').textContent = `${currentEventIndex + 1} of ${events.length}`;
-    
+    document.getElementById('eventCounter').textContent = `${currentEventIndex + 1} of ${currentEventTotal}`;
+
     // Build data display HTML
     let dataHtml = '';
     if (event.data && Object.keys(event.data).length > 0) {
@@ -358,9 +363,12 @@ async function nextEvent() {
 
 // Load more events from ClickHouse
 async function loadMoreEvents() {
+    if (isLoadingMoreEvents) return;
+    isLoadingMoreEvents = true;
+
     try {
         currentEventOffset += currentEventLimit;
-        
+
         const params = new URLSearchParams();
         params.append('name', currentEventName);
         params.append('limit', currentEventLimit.toString());
@@ -368,23 +376,25 @@ async function loadMoreEvents() {
         if (selectedKeys.length > 0) {
             params.append('keys', selectedKeys.join(','));
         }
-        
+
         const response = await fetch(`/api/projects/${currentProject.id}/events/details?${params}`, {
             headers: {
                 'X-User-ID': currentUser.id
             }
         });
-        
+
         if (response.ok) {
             const result = await response.json();
             const newEvents = result.events || [];
-            
+
+            if (typeof result.total === 'number') {
+                currentEventTotal = result.total;
+            }
+
             if (newEvents.length > 0) {
-                // Append new events to existing ones
                 currentEventDetails = currentEventDetails.concat(newEvents);
                 hasMoreEvents = newEvents.length === currentEventLimit;
-                
-                // Move to the first new event
+
                 currentEventIndex = currentEventDetails.length - newEvents.length;
                 displayEventDetails(currentEventDetails, currentEventName);
             } else {
@@ -399,6 +409,8 @@ async function loadMoreEvents() {
     } catch (error) {
         console.error('Error loading more events:', error);
         alert('Error loading more events: ' + error.message);
+    } finally {
+        isLoadingMoreEvents = false;
     }
 }
 

@@ -336,13 +336,11 @@ func (h *Handler) GetEventDetailsHandler(c *gin.Context) {
 		return
 	}
 
-	// Validate project ownership
 	if !h.cockroachClient.ValidateProjectOwnership(projectID, userID) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
-	// Get query parameters
 	eventName := c.Query("name")
 	if eventName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Event name required"})
@@ -361,14 +359,23 @@ func (h *Handler) GetEventDetailsHandler(c *gin.Context) {
 		}
 	}
 
-	limit := 10 // Default limit
+	limit := 10
 	if limitParam := c.Query("limit"); limitParam != "" {
 		if limitVal, err := strconv.Atoi(limitParam); err == nil {
 			limit = limitVal
 		}
 	}
 
-	// Get event details from Cassandra
+	// Get total from ClickHouse (more efficient than Cassandra)
+	total, err := h.clickhouseClient.GetEventCount(projectID.String(), eventName, filterKeys)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve total count"})
+		log.Printf("[api.GetEventDetailsHandler] Failed to get event count: %v", err)
+		return
+	}
+
+	print(total)
+
 	events, err := h.cassandraClient.GetEventDetails(projectID.String(), eventName, filterKeys, offset, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve event details"})
@@ -378,7 +385,7 @@ func (h *Handler) GetEventDetailsHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"events": events,
-		"total":  len(events),
+		"total":  total,
 	})
 }
 

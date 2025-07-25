@@ -3,7 +3,6 @@ package cassandra
 import (
 	"fmt"
 	"log"
-	"sort"
 	"strings"
 	"time"
 
@@ -138,14 +137,13 @@ func (c *CassandraClient) Insert(event models.LogRequest) error {
 
 // GetEventDetails retrieves detailed event data for a specific event name using Cassandra
 func (c *CassandraClient) GetEventDetails(projectID, eventName string, filterKeys []string, offset, limit int) ([]models.Event, error) {
-	// Parse projectID to UUID
 	projUUID, err := gocql.ParseUUID(projectID)
 	if err != nil {
 		return nil, fmt.Errorf("[cassandra.GetEventDetails] Invalid project ID: %v", err)
 	}
 
 	var args []interface{}
-	baseQuery := `
+	query := `
 		SELECT 
 			event_id,
 			project_id,
@@ -153,106 +151,76 @@ func (c *CassandraClient) GetEventDetails(projectID, eventName string, filterKey
 			time,
 			data
 		FROM logs.events 
-		WHERE project_id = ?`
+		WHERE project_id = ? AND name = ?
+	`
 
-	args = append(args, projUUID)
+	args = append(args, projUUID, eventName)
 
-	// Add name filter if provided
-	if eventName != "" {
-		baseQuery += " AND name = ?"
-		args = append(args, eventName)
-	}
+	stmt := c.Session.Query(query, args...).PageSize(1000).Consistency(gocql.LocalQuorum)
 
-	// Only add ORDER BY if we're not filtering by name (to avoid secondary index issues)
-	if eventName == "" {
-		baseQuery += " ORDER BY time DESC"
-	}
-
-	// Create query with performance optimizations
-	stmt := c.Session.Query(baseQuery, args...)
-
-	// Set consistency level for read operations (can be more relaxed for better performance)
-	stmt.SetConsistency(gocql.LocalQuorum)
-
-	// Set page size for efficient pagination
-	iter := stmt.PageSize(1000).Iter()
+	iter := stmt.Iter()
 	defer iter.Close()
 
-	var events []models.Event
-	var eventID gocql.UUID
-	var projID gocql.UUID
-	var name string
-	var timestamp time.Time
-	var dataMap map[string]string
+	var (
+		events    []models.Event
+		eventID   gocql.UUID
+		projID    gocql.UUID
+		name      string
+		timestamp time.Time
+		dataMap   map[string]string
+		count     int
+	)
 
-	// Collect all matching events
 	for iter.Scan(&eventID, &projID, &name, &timestamp, &dataMap) {
-		// Apply name filter in application if not already filtered in query
-		if eventName != "" && name != eventName {
-			continue
-		}
-
-		// Extract keys from data map for filtering
+		// filter keys (manually like before)
 		keys := make([]string, 0, len(dataMap))
-		for key := range dataMap {
-			keys = append(keys, key)
+		for k := range dataMap {
+			keys = append(keys, k)
 		}
 
-		// Apply key filters in application (more efficient than ALLOW FILTERING)
-		// Use the same logic as ClickHouse: ALL keys must be present (AND logic)
-		if len(filterKeys) > 0 {
-			allKeysPresent := true
-			for _, filterKey := range filterKeys {
-				keyFound := false
-				for _, eventKey := range keys {
-					if eventKey == filterKey {
-						keyFound = true
-						break
-					}
-				}
-				if !keyFound {
-					allKeysPresent = false
+		matches := true
+		for _, filter := range filterKeys {
+			found := false
+			for _, k := range keys {
+				if k == filter {
+					found = true
 					break
 				}
 			}
-			if !allKeysPresent {
-				continue
+			if !found {
+				matches = false
+				break
 			}
 		}
+		if !matches {
+			continue
+		}
 
-		event := models.Event{
+		if count < offset {
+			count++
+			continue
+		}
+
+		if len(events) >= limit {
+			break
+		}
+
+		events = append(events, models.Event{
 			EventID:   eventID,
 			ProjectID: projID.String(),
 			Name:      name,
 			Timestamp: timestamp,
 			Data:      dataMap,
 			CreatedAt: timestamp,
-		}
-		events = append(events, event)
+		})
+		count++
 	}
 
 	if err := iter.Close(); err != nil {
-		return nil, fmt.Errorf("[cassandra.GetEventDetails] Failed to execute query: %v", err)
+		return nil, fmt.Errorf("[cassandra.GetEventDetails] Iteration error: %v", err)
 	}
 
-	// Sort events by timestamp in descending order if we filtered by name
-	if eventName != "" {
-		sort.Slice(events, func(i, j int) bool {
-			return events[i].Timestamp.After(events[j].Timestamp) // Descending order
-		})
-	}
-
-	// Apply offset and limit
-	if offset >= len(events) {
-		return []models.Event{}, nil
-	}
-
-	end := offset + limit
-	if end > len(events) {
-		end = len(events)
-	}
-
-	return events[offset:end], nil
+	return events, nil
 }
 
 // Close closes the Cassandra session

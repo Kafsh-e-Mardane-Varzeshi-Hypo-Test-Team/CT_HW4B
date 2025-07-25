@@ -150,12 +150,16 @@ CREATE TABLE projects (
 CREATE TABLE logs.events (
     event_id UUID,
     project_id UUID,
-    name TEXT,
-    time TIMESTAMP,
-    keys LIST<TEXT>, 
-    PRIMARY KEY ((project_id), time, event_id)
-) WITH CLUSTERING ORDER BY (time DESC)
-   AND default_time_to_live = 2592000;
+    name String,
+    time DateTime,
+    keys Array(String),
+    created_at DateTime,
+    ttl_seconds UInt32,
+    date Date MATERIALIZED toDate(time)
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(time)
+ORDER BY (project_id, time, event_id)
+TTL time + INTERVAL ttl_seconds SECOND WHERE ttl_seconds > 0;
 ```
 
 </div>
@@ -301,39 +305,51 @@ Frontend → Go API → CockroachDB (همه چیز)
 - نیاز به project-specific TTL
 
 ## ۶. ارزیابی طراحی
+این تست‌ها در حالی انجام شده‌اند که تمامی کانتینرها روی یک سیستم معمولی در حال اجرا هستند.
 
 ### ۶.۱ تست کردن Performance
 
 #### پرفورمنس برای کوئری‌های Write
-- **هدف**: 10,000 events/second
-- **نتایج**: 
-  - Go API → Kafka: 15,000 events/second
-  - Kafka → Cassandra: 12,000 events/second
-  - Kafka → ClickHouse: 8,000 events/second
+====== Performance Result ======
+Total requests: 1000
+Successful: 1000, Failed: 0
+Elapsed time: 7.18s
+Throughput: 139.23 events/sec
+
 
 #### پرفورمنس برای کوئری‌های Read
-- **هدف**: Query response time < 100ms
-- **نتایج**:
-  - CockroachDB user queries: 50ms
-  - ClickHouse filtered queries: 80ms
-  - Cassandra event queries: 120ms
+Results for Get All Projects:
+  Total time: 1.355778597 seconds
+  Requests/sec: 147.51
+  Iterations: 200
 
-### ۶.۲ تست کردن Scalability
-- **هدف**: Support 100 concurrent users
-- **نتایج**: System handles 150 concurrent users without degradation
+Results for Get Single Project:
+  Total time: 1.147365428 seconds
+  Requests/sec: 174.31
+  Iterations: 200
 
-### ۶.۳ تست کردن Fault Tolerance
-- **هدف**: System continues working with single component failure
-- **نتایج**: 
-  - Kafka failure: Events queued in Go API, no data loss
-  - Cassandra failure: ClickHouse continues working, analytics available
-  - ClickHouse failure: Real-time data still available in Cassandra
-  - Go API failure: Kafka buffers events, consumers continue processing
+Results for Get Project Events:
+  Total time: 1.329567511 seconds
+  Requests/sec: 150.42
+  Iterations: 200
 
-### ۶.۴ تست کردن Data Consistency
+====== Read Performance Result ======
+Total requests: 5000
+Successful: 4897, Failed: 103
+Total duration: 117.49s
+Average latency: 1.163701593s
+Throughput: 41.68 requests/sec
+
+### ۶.۲ تست کردن Fault Tolerance
+با پایین رفتن هر یک نود از
+Cassandra, Kafka, 
+و یا 
+CockroachDB
+سیستم به درستی به کار خود ادامه می‌دهد.
+
+### ۶.۳ تست کردن Data Consistency
 - **هدف**: Event data consistency between Cassandra and ClickHouse
 - **نتایج**: 
-  - 99.9% data consistency achieved
   - Minor delays in ClickHouse due to processing overhead
   - No data loss in either storage system
 

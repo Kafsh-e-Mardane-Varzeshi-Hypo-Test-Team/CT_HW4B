@@ -1,0 +1,67 @@
+Test data initialized in .112232756 seconds
+
+Running User Signup benchmark (100 iterations)...
+Results for User Signup:
+  Total time: .617966155 seconds
+  Requests/sec: 161.82
+  Iterations: 100
+
+Running Project Creation benchmark (100 iterations)...
+Results for Project Creation:
+  Total time: .483291632 seconds
+  Requests/sec: 206.91
+  Iterations: 100
+
+Running Log Submission benchmark (1000 iterations)...
+Results for Log Submission:
+  Total time: 14.823592668 seconds
+  Requests/sec: 67.46
+  Iterations: 1000
+
+Running Get All Projects benchmark (200 iterations)...
+Results for Get All Projects:
+  Total time: 1.355778597 seconds
+  Requests/sec: 147.51
+  Iterations: 200
+
+Running Get Single Project benchmark (200 iterations)...
+Results for Get Single Project:
+  Total time: 1.147365428 seconds
+  Requests/sec: 174.31
+  Iterations: 200
+
+Running Get Project Events benchmark (200 iterations)...
+Results for Get Project Events:
+  Total time: 1.329567511 seconds
+  Requests/sec: 150.42
+  Iterations: 200
+
+Running Mixed Read-Write Workload benchmark (100 iterations)...
+Results for Mixed Read-Write Workload:
+  Total time: .414143453 seconds
+  Requests/sec: 241.46
+  Iterations: 100
+
+Running Validate Session benchmark (200 iterations)...
+Results for Validate Session:
+  Total time: 1.406773942 seconds
+  Requests/sec: 142.16
+  Iterations: 200
+
+=== Performance Test Summary ===
+Results for User Signup:
+Results for Project Creation:
+Results for Log Submission:
+Results for Get All Projects:
+Results for Get Single Project:
+Results for Get Project Events:
+Results for Mixed Read-Write Workload:
+Results for Validate Session:
+  Requests/sec: 161.82
+  Requests/sec: 206.91
+  Requests/sec: 67.46
+  Requests/sec: 147.51
+  Requests/sec: 174.31
+  Requests/sec: 150.42
+  Requests/sec: 241.46
+  Requests/sec: 142.16

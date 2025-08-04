@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Details - Log Analytics Platform</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1><a href="/dashboard" class="nav-link">Log Analytics</a></h1>
+            </div>
+            <div class="nav-user">
+                <span id="username"></span>
+                <button onclick="logout()" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="project-header">
+            <div class="breadcrumb">
+                <a href="/dashboard">Dashboard</a> / <span id="projectName">Loading...</span>
+            </div>
+            <h2 id="projectTitle">Loading...</h2>
+        </div>
+
+        <div class="project-details">
+            <div class="project-info">
+                <div class="info-card">
+                    <h3>Project Information</h3>
+                    <div class="info-item">
+                        <label>Project ID:</label>
+                        <span id="projectId">Loading...</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Created:</label>
+                        <span id="projectCreated">Loading...</span>
+                    </div>
+                    <div class="info-item">
+                        <label>TTL:</label>
+                        <span id="projectTtl">Loading...</span>
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h3>API Key</h3>
+                    <div class="api-key-container">
+                        <input type="text" id="apiKey" readonly>
+                        <button onclick="copyApiKey()" class="btn-secondary">Copy</button>
+                    </div>
+                    <p class="api-key-note">Use this API key to submit logs to this project</p>
+                </div>
+
+                <div class="info-card">
+                    <h3>Searchable Keys</h3>
+                    <div id="searchableKeys" class="keys-list">
+                        <span>Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="events-section">
+            <div class="events-header">
+                <h3>Events</h3>
+                <div class="filters">
+                    <div class="filter-group">
+                        <label>Filter by keys:</label>
+                        <div id="keyFilters" class="key-filters">
+                            <span>Loading...</span>
+                        </div>
+                    </div>
+                    <button onclick="clearFilters()" class="btn-secondary">Clear Filters</button>
+                </div>
+            </div>
+
+            <div class="events-table-container">
+                <table class="events-table">
+                    <thead>
+                        <tr>
+                            <th>Event Name</th>
+                            <th>Last Occurrence</th>
+                            <th>Count</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="eventsTableBody">
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 2rem;">
+                                Loading events...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Event Details Modal -->
+    <div id="eventModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="eventModalTitle">Event Details</h3>
+                <span class="close" onclick="closeEventModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="event-navigation">
+                    <button onclick="previousEvent()" class="btn-secondary">Previous</button>
+                    <span id="eventCounter">1 of 1</span>
+                    <button onclick="nextEvent()" class="btn-secondary">Next</button>
+                </div>
+                <div id="eventDetails">
+                    <p>Loading event details...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/project.js"></script>
+</body>
+</html> 

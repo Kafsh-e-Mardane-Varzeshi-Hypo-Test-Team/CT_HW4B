@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Log Analytics Platform</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h1>Log Analytics</h1>
+            </div>
+            <div class="nav-user">
+                <span id="username"></span>
+                <button onclick="logout()" class="btn-secondary">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="dashboard-header">
+            <h2>Welcome, <span id="userDisplayName"></span>!</h2>
+            <button onclick="showCreateProjectModal()" class="btn-primary">+ New Project</button>
+        </div>
+
+        <div class="projects-section">
+            <h3>Your Projects</h3>
+            <div id="projectsList" class="projects-grid">
+                <!-- Projects will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Project Modal -->
+    <div id="createProjectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New Project</h3>
+                <span class="close" onclick="closeCreateProjectModal()">&times;</span>
+            </div>
+            <form id="createProjectForm">
+                <div class="form-group">
+                    <label for="projectName">Project Name</label>
+                    <input type="text" id="projectName" name="name" required maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label for="searchableKeys">Searchable Keys (comma-separated)</label>
+                    <input type="text" id="searchableKeys" name="searchable_keys" placeholder="e.g., user_id, session_id, error_type">
+                    <small style="color: #6b7280; font-size: 0.875rem;">
+                        These keys will be used for filtering. Your log data can include any key-value pairs.
+                    </small>
+                </div>
+                <div class="form-group">
+                    <label for="ttl">TTL (optional)</label>
+                    <input type="text" id="ttl" name="ttl" placeholder="e.g., 30d, 24h">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeCreateProjectModal()" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Create Project</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html> 
